@@ -1,0 +1,46 @@
+<project name="helloclojure" basedir="." default="compile">
+ 
+  <property environment="env" />  
+  <property name="sdk.dir" location="/home/jfoster/appengine-java-sdk-1.2.0" />
+  <property name="classes.dir" value="war/WEB-INF/classes" />
+  <property name="lib.dir" value="war/WEB-INF/lib" />
+  <property name="src.dir" value="src/" />
+  
+  <import file="${sdk.dir}/config/user/ant-macros.xml"/>
+  
+  <path id="project.classpath">
+    <pathelement path="${classes.dir}" />
+    <pathelement path="${src.dir}/helloworld" />
+    <fileset dir="${lib.dir}">
+      <include name="**/*.jar" />
+    </fileset>
+    <fileset dir="${sdk.dir}/lib">
+      <include name="**/*.jar" />
+    </fileset>
+  </path>
+  
+  <target name="clean">
+    <delete dir="${classes.dir}" />
+  </target>
+  
+  <target name="init">
+    <mkdir dir="${classes.dir}" />
+  </target>
+  
+  <target name="compile" depends="clean,init">
+    <java classname="clojure.lang.Compile" classpathref="project.classpath" failonerror="true">
+      <classpath path="${src.dir}" />
+      <sysproperty key="clojure.compile.path" value="${classes.dir}" />
+      <arg value="helloclojure.servlet" />
+    </java>
+  </target>
+  
+  <target name="devserver" description="run local dev appserver" depends="compile">
+    <dev_appserver war="war" />
+  </target>
+  
+  <target name="deploy" description="deploy to appspot" depends="compile">
+    <appcfg action="update" war="war" />
+  </target>
+  
+</project>

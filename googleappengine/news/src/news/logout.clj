@@ -9,4 +9,4 @@
   (let [userService (UserServiceFactory/getUserService)
 	user (.getCurrentUser userService)]
     (when (not (nil? user))
-      (.createLogoutURL userService (.getRequestURI request)))))
+      (.sendRedirect response (.createLogoutURL userService (.getRequestURI request))))))

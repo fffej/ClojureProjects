@@ -6,7 +6,7 @@
 <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.5">
     <servlet>
         <servlet-name>login</servlet-name>
-        <servlet-class>blogging.login</servlet-class>
+        <servlet-class>news.login</servlet-class>
     </servlet>
     <servlet-mapping>
         <servlet-name>login</servlet-name>

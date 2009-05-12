@@ -1,4 +1,5 @@
 (ns news.login                                                                        
+  (:use (news appengine))
   (:gen-class :extends javax.servlet.http.HttpServlet)
   (:import (com.google.appengine.api.users User UserService UserServiceFactory)))         
                                       
@@ -12,6 +13,5 @@
   [_ request response]
   (let [userService (UserServiceFactory/getUserService)
 	user (.getCurrentUser userService)]
-    (cond
-      (not (nil? user)) (greet user response)
-      :else (.sendRedirect response (.createLoginURL userService (.getRequestURI request))))))
+    (when (ensure-authenticated request response)
+      (greet user response))))

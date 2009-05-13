@@ -38,15 +38,11 @@
     </java>
   </target>
 
-  <target name="datanucleusenhance" depends="compile" description="JDO enhancements on classes.">
-    <enhance_war war="war" />
-  </target>
-  
-  <target name="devserver" description="run local dev appserver" depends="compile,datanucleusenhance">
+  <target name="devserver" description="run local dev appserver" depends="compile">
     <dev_appserver war="war" />
   </target>
   
-  <target name="deploy" description="deploy to appspot" depends="compile,datanucleusenhance">
+  <target name="deploy" description="deploy to appspot" depends="compile">
     <appcfg action="update" war="war" />
   </target>
   

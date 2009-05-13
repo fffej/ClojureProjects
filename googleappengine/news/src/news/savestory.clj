@@ -14,6 +14,12 @@
 (defn -doGet                                                  
   [_ request response]
   (ensure-authenticated request response) ;; TODO define a macro to avoid this repetition in every servlet!
-  (let [body (.getParameter request "bodytext")
-	title (.getParameter request "title")]    
-    (store {:body body :title title} "story")))
+  (let [body (.getParameter request "storyLink")
+	title (.getParameter request "storyTitle")]    
+    (.setContentType response "text/plain")
+    (let [w (.getWriter response)]
+      (.println w (str body title)))))
+;;      (.println w (str "Hello, " (.getNickname user)))))
+
+
+   ;; (store {:body body :title title} "story")))

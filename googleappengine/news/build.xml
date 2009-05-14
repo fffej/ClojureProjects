@@ -35,6 +35,8 @@
       <arg value="news.savestory" />
       <arg value="news.logout" />
       <arg value="news.appengine" />
+      <arg value="news.viewstory" />
+      <arg value="news.liststory" />
     </java>
   </target>
 

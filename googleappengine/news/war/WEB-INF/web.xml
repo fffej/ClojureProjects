@@ -3,6 +3,7 @@
  "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
  "http://java.sun.com/dtd/web-app_2_3.dtd">
 
+<!-- TODO write a macro to produce this, this is SO tedious" -->
 <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.5">
   <servlet>
     <servlet-name>login</servlet-name>
@@ -18,6 +19,16 @@
     <servlet-name>savestory</servlet-name>
     <servlet-class>news.savestory</servlet-class>
   </servlet>
+  
+  <servlet>
+    <servlet-name>viewstory</servlet-name>
+    <servlet-class>news.viewstory</servlet-class>
+  </servlet>
+
+  <servlet>
+    <servlet-name>liststory</servlet-name>
+    <servlet-class>news.liststory</servlet-class>
+  </servlet>
  
   <servlet-mapping>
     <servlet-name>login</servlet-name>
@@ -32,6 +43,16 @@
   <servlet-mapping>
     <servlet-name>savestory</servlet-name>
     <url-pattern>/savestory</url-pattern>
+  </servlet-mapping>
+
+  <servlet-mapping>
+    <servlet-name>viewstory</servlet-name>
+    <url-pattern>/viewstory</url-pattern>
+  </servlet-mapping>
+
+  <servlet-mapping>
+    <servlet-name>liststory</servlet-name>
+    <url-pattern>/liststory</url-pattern>
   </servlet-mapping>
    
   <welcome-file-list>

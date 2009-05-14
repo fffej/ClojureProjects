@@ -23,7 +23,7 @@
 
 (defn get-all
   [type]
-  (let [query (Query. type)
+  (let [query (Query. (str type))
 	service (DatastoreServiceFactory/getDatastoreService)]
     (map entity-to-map (.asIterable (.prepare service query)))))
 

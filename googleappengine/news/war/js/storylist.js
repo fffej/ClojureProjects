@@ -8,10 +8,11 @@ Ext.onReady(function(){
     remoteSort: true,
 
     fields: [
+      'body', 'title'
     ],
 
     proxy: new Ext.data.HttpProxy({
-      url: 'http://localhost:8080/liststory'
+      url: 'http://localhost:8080/liststory?'
     })
   });
 
@@ -20,17 +21,18 @@ Ext.onReady(function(){
     title: 'Clojure News!',
     store: store,
     loadMask: true,
+    height: 400,
     columns:[{
       header: 'Title',
-      dataIndex: 'storyTitle'
+      dataIndex: 'body'
     },{
       header: 'Link',
-      dataIndex: 'storyLink'
+      dataIndex: 'title'
     }]
   });
 
   grid.render();
 
   // trigger the datastore load
-  store.load({params: {maxresults: 25}});
+  store.load({});
 });

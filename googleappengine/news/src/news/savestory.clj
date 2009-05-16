@@ -7,4 +7,4 @@
   (let [body (.getParameter request "storyLink")
 	title (.getParameter request "storyTitle")]    
     (let [w (.getWriter response)]
-      (.println w (store {:body body :title title} :story)))))
+      (.println w (store {"body" body "title" title} "story")))))

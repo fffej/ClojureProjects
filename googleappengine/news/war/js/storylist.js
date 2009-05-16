@@ -1,12 +1,9 @@
-// Load up some stories from a URL and display them in an Ext Grid
 
 Ext.onReady(function(){
   var store = new Ext.data.JsonStore({
     root: 'stories',
     totalProperty: 'totalCount',
     idProperty: 'storyId',
-    remoteSort: true,
-
     fields: [
       'body', 'title'
     ],
@@ -23,16 +20,14 @@ Ext.onReady(function(){
     loadMask: true,
     height: 400,
     columns:[{
-      header: 'Title',
+      header: 'Link',
       dataIndex: 'body'
     },{
-      header: 'Link',
+      header: 'Description',
       dataIndex: 'title'
     }]
   });
 
   grid.render();
-
-  // trigger the datastore load
   store.load({});
 });

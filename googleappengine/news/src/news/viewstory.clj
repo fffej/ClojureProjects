@@ -5,7 +5,7 @@
 (defn -doGet                                                  
   [_ request response]
   (let [id (.getParameter request "storyId")
-	story (get-entity id :story)
+	story (get-entity id "story")
 	w (.getWriter response)]
     (doseq [[k v] story]
       (.println w (str k "=" v)))))

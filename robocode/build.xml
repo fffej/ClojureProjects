@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<project name="My First Robot" default="build" basedir=".">
+
+  <property name="classes.dir" location="./classes" />
+  <property name="src.dir" value="src/" />
+
+  <path id="project.classpath">
+    <pathelement location="/home/jfoster/lisp/clj/clojure/clojure.jar" />
+    <pathelement location="/usr/share/java/robocode.jar" />
+    <pathelement location="${classes.dir}" /> 
+  </path>
+
+  <target name="clj" description="Compile Clojure source">
+    <mkdir dir="${classes.dir}" />
+    <java classname="clojure.lang.Compile" classpathref="project.classpath" failonerror="true">
+      <classpath path="${src.dir}"/>
+      <sysproperty key="clojure.compile.path" value="${classes.dir}" />
+      <arg value="uk.co.fatvat.robot.FatRobot" />
+    </java>
+  </target>
+
+  <target name="clean">
+    <delete dir="${classes.dir}" />
+  </target>
+
+  <target name="build" depends="clean,clj" description="Build this project" />
+
+</project>

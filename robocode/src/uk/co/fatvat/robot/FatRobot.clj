@@ -4,8 +4,9 @@
 (defn -run
   [robot]
   "Infinite loop whilst robot is alive"
-  (.ahead robot 10)
-  (.back robot 10)
+  (doto robot
+    (.ahead 50)
+    (.back  50))
   (recur robot))
 
 (defn -onScannedRobotEvent

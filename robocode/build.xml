@@ -6,7 +6,7 @@
 
   <path id="project.classpath">
     <pathelement location="/home/jfoster/lisp/clj/clojure/clojure.jar" />
-    <pathelement location="/usr/share/java/robocode.jar" />
+    <pathelement location="/home/jfoster/robocode/libs/robocode.jar" />
     <pathelement location="${classes.dir}" /> 
   </path>
 

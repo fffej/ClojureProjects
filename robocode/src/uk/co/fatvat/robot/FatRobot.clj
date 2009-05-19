@@ -5,11 +5,12 @@
   [robot]
   "Infinite loop whilst robot is alive"
   (doto robot
-    (.ahead 50)
-    (.back  50))
+    (.ahead 500)
+    (.turnGunRight 360)
+    (.back  500))
   (recur robot))
 
-(defn -onScannedRobotEvent
+(defn -onScannedRobot
   [robot event]
   (doto robot
     (.fire 1)))

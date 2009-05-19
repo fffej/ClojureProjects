@@ -16,6 +16,7 @@
       <classpath path="${src.dir}"/>
       <sysproperty key="clojure.compile.path" value="${classes.dir}" />
       <arg value="uk.co.fatvat.robot.FatRobot" />
+      <arg value="uk.co.fatvat.robot.NotQuiteAsBad" />
     </java>
   </target>
 

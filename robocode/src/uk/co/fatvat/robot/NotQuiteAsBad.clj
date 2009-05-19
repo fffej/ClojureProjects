@@ -6,8 +6,8 @@
 
 (defn -create-robot
   []
-  "Create a new robot and use it to record state"
-  [[] (ref {})])
+  "Robot records a list of events and performs actions based on these observations"
+  [[] (ref [])])
 
 (defn- setup-robot
   [robot]
@@ -17,18 +17,37 @@
     (.setAdjustRadarForGunTurn true)
     (.setAdjustGunForRobotTurn true)))
 
+(defn- walk
+  [robot]
+  "Go for a random walk to try and find someone to hurt"
+  (doto robot
+    (.ahead (rand-int 100))
+    (.turnRight (rand-int 360))
+    (.turnRadarLeft (rand-int 360))
+    (.back (rand-int 100))
+    (.turnLeft (rand-int 360))))
+
+(defn- attack
+  [robot history]
+  "Based on the accrued events, hurt robots"
+  (doto robot
+    (.fire 3)))
+	       
+(defn- process-events
+  [robot]
+  (let [state @(.state robot)]
+    (if (empty? state)
+      (walk robot)
+      (attack robot state))))
+
 (defn -run
   [robot]
   "Infinite loop whilst robot is alive"
   (setup-robot robot)
   (loop [x 1] ;; TODO is there a better idiom for an infinite loop?
-    (doto robot
-      (.ahead 10)
-      (.back 10)
-      (.fire 3))
+    (process-events robot)
     (recur 1))
-
- (recur robot))
+  (recur robot))
 
 (defn -onScannedRobot
   [robot event]
@@ -39,5 +58,4 @@
 	bearing (.getBearing event)
 	state (.state robot)]
     (dosync
-     (alter (.state robot)
-	    assoc name (cons (struct target-details distance bearing energy velocity) (get @state name []))))))
+     (alter (.state robot) (cons (struct target-details distance bearing energy velocity) @state)))))

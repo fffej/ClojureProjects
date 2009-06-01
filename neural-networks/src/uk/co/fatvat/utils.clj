@@ -18,7 +18,7 @@
        (take 100 (repeatedly #(jiggle [0 0])))
        (take 100 (repeatedly #(jiggle [1 1]))))
       (concat
-       (repeat 100 1)
-       (repeat 100 1)
-       (repeat 100 0)
-       (repeat 100 0))])
+       (repeat 100 [1])
+       (repeat 100 [1])
+       (repeat 100 [0])
+       (repeat 100 [0]))])

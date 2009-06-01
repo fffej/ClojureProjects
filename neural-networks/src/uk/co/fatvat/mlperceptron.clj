@@ -70,32 +70,37 @@
 	wi (get network :weight-input)
 	output-deltas (map (fn [o e] (* (activation-function-derivation o) (- e o))) output expected)
 	hidden-deltas (map (fn [x y] (* (activation-function-derivation x) y)) output (matrix-reduce wo output-deltas identity))
-	error 
-	  (reduce + (map 
-		     (fn [e o] 
-		       (let [d (- e o)]
-			 (* 0.5 (* d d))))
-		     expected output))
+	error  (reduce + (map (fn [e o] (let [d (- e o)] (* 0.5 (* d d)))) expected output))
         output-updates (update-weights wo co hidden output-deltas)
 	input-updates  (update-weights wi ci pattern hidden-deltas)]
-    (struct bp-nn
+    [(struct bp-nn
 	    (matrix-map input-updates first)
 	    (matrix-map output-updates first)
 	    (matrix-map input-updates second)
-	    (matrix-map output-updates second))))
+	    (matrix-map output-updates second)) error]))
 
+(defn run-iteration
+  [network patterns expecteds]
+  (let [results (map 
+		 (fn [pattern expected]
+		   (let [output (run-network pattern network)]
+		     (back-propogate pattern (first output) expected (second output) network)))
+		 patterns expecteds)
+	error (reduce + (map second results))]
+    (println "Error this iteration: " error)
+    (first (last results)))) ;; TODO grossly inefficient!
+    
 (defn train-network
-  ([patterns expected]
-     (let [n (create-network (count (first patterns)) 2 (count (first expected)))]
-       (train-network patterns expected n)))
-  ([patterns expected network]
-     (if (empty? patterns)
+  ([patterns expected iterations]
+     (let [n (create-network (count (first patterns)) 10 (count (first expected)))]
+       (train-network patterns expected n iterations)))
+  ([patterns expected network iterations]
+     (if (zero? iterations)
        network
-       (let [output (run-network (first patterns) network)]
-	 (recur (rest patterns) (rest expected) (back-propogate (first patterns) (first output) (first expected) (second output) network))))))
+       (recur patterns expected (run-iteration network patterns expected) (dec iterations)))))
 
 (defn example[]
-  (let [x (apply train-network xor-test-data)]
+  (let [x (apply train-network-2 (conj xor-test-data 1000))]
     (println (first (run-network [0 0] x)) "-->" 0)
     (println (first (run-network [0 1] x)) "-->" 1)
     (println (first (run-network [1 0] x)) "-->" 1)

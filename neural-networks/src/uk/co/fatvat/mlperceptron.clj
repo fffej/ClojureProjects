@@ -50,13 +50,15 @@
   (let [wi (get network :weight-input)
 	wo (get network :weight-output)
 	ah (matrix-reduce wi pattern activation-function)] 
-    [(matrix-reduce wo ah activation-function)
-     ah]))
+    [(matrix-reduce wo ah activation-function) ah]))
 
 (defn update-weights
   [m c p pd]
   "Update the weights for the given matrix, with the momentum, pattern and delta"
-  (map (fn [w cx h d] (map (fn [o c] [(+ o (* learning-rate (* h d)) (* momentum c)) (* h d)]) w cx)) m c p pd))
+  (map (fn [w cx h d] 
+	 (let [v (* h d)]
+	   (map (fn [o c] [(+ o (* learning-rate v) (* momentum c)) v]) w cx)))
+       m c p pd))
 
 (defn back-propogate
   [pattern output expected hidden network]
@@ -68,8 +70,13 @@
 	wi (get network :weight-input)
 	output-deltas (map (fn [o e] (* (activation-function-derivation o) (- e o))) output expected)
 	hidden-deltas (map (fn [x y] (* (activation-function-derivation x) y)) output (matrix-reduce wo output-deltas identity))
-	error (reduce + (map (fn [e o] (* 0.5 (* (- e o) (- e o)))) expected output))
-        output-updates (update-weights wo co hidden hidden-deltas)
+	error 
+	  (reduce + (map 
+		     (fn [e o] 
+		       (let [d (- e o)]
+			 (* 0.5 (* d d))))
+		     expected output))
+        output-updates (update-weights wo co hidden output-deltas)
 	input-updates  (update-weights wi ci pattern hidden-deltas)]
     (struct bp-nn
 	    (matrix-map input-updates first)
@@ -79,10 +86,18 @@
 
 (defn train-network
   ([patterns expected]
-     (let [n (create-network (count (first patterns)) 10 (count (first expected)))]
+     (let [n (create-network (count (first patterns)) 2 (count (first expected)))]
        (train-network patterns expected n)))
   ([patterns expected network]
      (if (empty? patterns)
        network
        (let [output (run-network (first patterns) network)]
 	 (recur (rest patterns) (rest expected) (back-propogate (first patterns) (first output) (first expected) (second output) network))))))
+
+(defn example[]
+  (let [x (apply train-network xor-test-data)]
+    (println (first (run-network [0 0] x)) "-->" 0)
+    (println (first (run-network [0 1] x)) "-->" 1)
+    (println (first (run-network [1 0] x)) "-->" 1)
+    (println (first (run-network [1 1] x)) "-->" 0)))
+			     

@@ -13,7 +13,7 @@
 (defn make-matrix
   [width height]
   "Create a matrix (list of lists)"
-  (repeat height (repeat width 0)))
+  (repeat width (repeat height 0)))
 
 (defn matrix-map
   [m func]
@@ -28,81 +28,54 @@
 (defn create-network
   [input hidden output]
   "Create a network with the given number of input, hidden and output nodes"
-  (struct bp-nn
-	  (matrix-map (make-matrix input hidden) (fn [_] (rand-range -0.2 0.2)))
-	  (matrix-map (make-matrix hidden output) (fn [_] (rand-range -2.0 2.0)))
-	  (make-matrix input hidden)
-	  (make-matrix hidden output)))
+  (let [i (inc input)] ;; bias term
+    (struct bp-nn
+	    (matrix-map (make-matrix i hidden) (fn [_] 0.2))      ;; TODO random range
+	    (matrix-map (make-matrix hidden output) (fn [_] 2.0)) ;; TODO random range
+	    (make-matrix i hidden)
+	    (make-matrix hidden output))))
 
-(defn matrix-reduce 
-  [matrix column f]
-  "Multiply each row in the matrix by the column and apply f to the sum of the resulting elements"
-  (map
-   (fn [w p]
-     (f (reduce + (map (partial * p) w))))
-   matrix
-   column))
+(defn apply-activation-function
+  [wi pattern]
+  "Calculate the hidden activations"
+  (apply map (comp activation-function +) (map (fn [col p] (map (fn [row] (* row p)) col)) wi pattern)))
+
+(defn calculate-hidden-deltas
+  [wo ah od]
+  "Calculate the error terms for the hidden"
+  (let [error (map (fn [col] (reduce + (map (fn [row o] (* row o)) col od))) wo)]
+    (map (fn [h e] (* e (activation-function-derivation h))) ah error)))
 
 (defn run-network
   [pattern network]
   "Run the network with the given pattern and return the output and the hidden values"
-  (assert (= (count pattern) (count (first (get network :weight-input)))))
-  (let [wi (get network :weight-input)
-	wo (get network :weight-output)
-	ah (matrix-reduce wi pattern activation-function)] 
-    [(matrix-reduce wo ah activation-function) ah]))
+  (assert (= (count pattern) (dec (count (get network :weight-input)))))
+  (let [p (conj pattern 1)] ;; ensure bias term added
+    (let [wi (get network :weight-input)
+	  wo (get network :weight-output)
+	  ah (apply-activation-function wi p)
+	  ao (apply-activation-function wo ah)]
+      [ao ah])))
 
-(defn update-weights
-  [m c p pd]
-  "Update the weights for the given matrix, with the momentum, pattern and delta"
-  (map (fn [w cx h d] 
-	 (let [v (* h d)]
-	   (map (fn [o c] [(+ o (* learning-rate v) (* momentum c)) v]) w cx)))
-       m c p pd))
+(defn back-propagate
+  [target pattern results network]
+  "Back propagate the results to adjust the rates"
+  (assert (= (count target) (count (first (get network :weight-output)))))
+  (let [ao (first results)
+	ah (second results)
+	error (map - target ao)
+	output-deltas (map (fn [o e] (* e (activation-function-derivation o))) ao error)
+	hidden-deltas (calculate-hidden-deltas (get network :weight-output) ah output-deltas)]
+    (println "ACTIVATION_OUTPUT" ao)
+    (println "OUTPUT_DELTAS" output-deltas)
+    (println "HIDDEN_DELTAS" hidden-deltas)
+  ))
 
-(defn back-propogate
-  [pattern output expected hidden network]
-  "Apply back propogation to the network with the given pattern and error"
-  (assert (= (count expected) (count (get network :weight-output))))
-  (let [co (get network :momentum-output)
-	ci (get network :momentum-input)
-	wo (get network :weight-output)
-	wi (get network :weight-input)
-	output-deltas (map (fn [o e] (* (activation-function-derivation o) (- e o))) output expected)
-	hidden-deltas (map (fn [x y] (* (activation-function-derivation x) y)) output (matrix-reduce wo output-deltas identity))
-	error  (reduce + (map (fn [e o] (let [d (- e o)] (* 0.5 (* d d)))) expected output))
-        output-updates (update-weights wo co hidden output-deltas)
-	input-updates  (update-weights wi ci pattern hidden-deltas)]
-    [(struct bp-nn
-	    (matrix-map input-updates first)
-	    (matrix-map output-updates first)
-	    (matrix-map input-updates second)
-	    (matrix-map output-updates second)) error]))
-
-(defn run-iteration
-  [network patterns expecteds]
-  (let [results (map 
-		 (fn [pattern expected]
-		   (let [output (run-network pattern network)]
-		     (back-propogate pattern (first output) expected (second output) network)))
-		 patterns expecteds)
-	error (reduce + (map second results))]
-    (println "Error this iteration: " error)
-    (first (last results)))) ;; TODO grossly inefficient!
-    
-(defn train-network
-  ([patterns expected iterations]
-     (let [n (create-network (count (first patterns)) 10 (count (first expected)))]
-       (train-network patterns expected n iterations)))
-  ([patterns expected network iterations]
-     (if (zero? iterations)
-       network
-       (recur patterns expected (run-iteration network patterns expected) (dec iterations)))))
-
+(comment 
 (defn example[]
-  (let [x (apply train-network-2 (conj xor-test-data 1000))]
+  (let [x (apply train-network (conj xor-test-data 10))]
     (println (first (run-network [0 0] x)) "-->" 0)
     (println (first (run-network [0 1] x)) "-->" 1)
     (println (first (run-network [1 0] x)) "-->" 1)
-    (println (first (run-network [1 1] x)) "-->" 0)))
+    (println (first (run-network [1 1] x)) "-->" 0))))
 			     

@@ -46,6 +46,18 @@
   (let [error (map (fn [col] (reduce + (map (fn [row o] (* row o)) col od))) wo)]
     (map (fn [h e] (* e (activation-function-derivation h))) ah error)))
 
+(defn update-output-weights
+  [wo output-deltas co ah]
+  (println wo output-deltas co ah)
+  (let [x (map 
+	   (fn [wcol ccol h] 
+	     (map (fn [wrow crow od] 
+		    (let [change (* od h)]
+		      [(+ wrow (* learning-rate change) (* momentum crow)) change]))
+		  wcol ccol output-deltas))
+	   wo co ah)]
+    [(matrix-map x first) (matrix-map x second)]))
+
 (defn run-network
   [pattern network]
   "Run the network with the given pattern and return the output and the hidden values"
@@ -65,10 +77,10 @@
 	ah (second results)
 	error (map - target ao)
 	output-deltas (map (fn [o e] (* e (activation-function-derivation o))) ao error)
-	hidden-deltas (calculate-hidden-deltas (get network :weight-output) ah output-deltas)]
-    (println "ACTIVATION_OUTPUT" ao)
-    (println "OUTPUT_DELTAS" output-deltas)
-    (println "HIDDEN_DELTAS" hidden-deltas)
+	hidden-deltas (calculate-hidden-deltas (get network :weight-output) ah output-deltas)
+	wo (get network :weight-output)
+	co (get network :momentum-output)]
+    (update-output-weights wo output-deltas co ah)
   ))
 
 (comment 

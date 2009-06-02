@@ -8,7 +8,7 @@
 (def learning-rate 0.5)
 (def momentum 0.1)
 
-(defstruct bp-nn :weight-input :weight-output :momentum-input :momentum-output)
+(defstruct bp-nn :weight-input :weight-output :change-input :change-output)
 
 (defn make-matrix
   [width height]
@@ -46,9 +46,8 @@
   (let [error (map (fn [col] (reduce + (map (fn [row o] (* row o)) col od))) wo)]
     (map (fn [h e] (* e (activation-function-derivation h))) ah error)))
 
-(defn update-output-weights
+(defn update-weights
   [wo output-deltas co ah]
-  (println wo output-deltas co ah)
   (let [x (map 
 	   (fn [wcol ccol h] 
 	     (map (fn [wrow crow od] 
@@ -78,9 +77,19 @@
 	error (map - target ao)
 	output-deltas (map (fn [o e] (* e (activation-function-derivation o))) ao error)
 	hidden-deltas (calculate-hidden-deltas (get network :weight-output) ah output-deltas)
+	wi (get network :weight-input)
 	wo (get network :weight-output)
-	co (get network :momentum-output)]
-    (update-output-weights wo output-deltas co ah)
+	ci (get network :change-input)
+	co (get network :change-output)
+	updated-output-weights (update-weights wo output-deltas co ah)
+	updated-input-weights (update-weights wi hidden-deltas ci pattern)]
+    (println updated-input-weights)
+    (println updated-output-weights)
+    (struct bp-nn
+	    (first  updated-input-weights)
+	    (first  updated-output-weights)
+	    (second updated-input-weights)
+	    (second updated-output-weights))
   ))
 
 (comment 

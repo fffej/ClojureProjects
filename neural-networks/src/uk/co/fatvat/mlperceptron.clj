@@ -85,7 +85,7 @@
 	output-deltas (map (fn [o e] (* e (activation-function-derivation o))) ao error)
 	hidden-deltas (calculate-hidden-deltas wo ah output-deltas)
 	updated-output-weights (update-weights wo output-deltas co ah)
-	updated-input-weights (update-weights wi hidden-deltas ci ao)]
+	updated-input-weights (update-weights wi hidden-deltas ci pattern)]
 
     (struct bp-nn
 	    (first  updated-input-weights)

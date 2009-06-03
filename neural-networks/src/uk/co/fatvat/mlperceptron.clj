@@ -40,21 +40,23 @@
   "Calculate the hidden activations"
   (apply map (comp activation-function +) (map (fn [col p] (map (fn [row] (* row p)) col)) wi pattern)))
 
+;; TODO this doesn't look quite right...
 (defn calculate-hidden-deltas
   [wo ah od]
   "Calculate the error terms for the hidden"
-  (let [error (map (fn [col] (reduce + (map (fn [row o] (* row o)) col od))) wo)]
-    (map (fn [h e] (* e (activation-function-derivation h))) ah error)))
+  (let [errors (map (partial reduce +) (map (fn [x] (map (fn [y z] (* y z)) x od)) wo))] ;; Sick.
+    (map (fn [h e] (* e (activation-function-derivation h))) ah errors)))
+    
 
 (defn update-weights
-  [wo output-deltas co ah]
+  [w deltas co ah]
   (let [x (map 
 	   (fn [wcol ccol h] 
 	     (map (fn [wrow crow od] 
 		    (let [change (* od h)]
 		      [(+ wrow (* learning-rate change) (* momentum crow)) change]))
-		  wcol ccol output-deltas))
-	   wo co ah)]
+		  wcol ccol deltas))
+	   w co ah)]
     [(matrix-map x first) (matrix-map x second)]))
 
 (defn run-network
@@ -69,28 +71,46 @@
       [ao ah])))
 
 (defn back-propagate
-  [target pattern results network]
+  [target p results network]
   "Back propagate the results to adjust the rates"
   (assert (= (count target) (count (first (get network :weight-output)))))
-  (let [ao (first results)
+  (let [pattern (conj p 1) ;; ensure bias term added
+	ao (first results)
 	ah (second results)
 	error (map - target ao)
-	output-deltas (map (fn [o e] (* e (activation-function-derivation o))) ao error)
-	hidden-deltas (calculate-hidden-deltas (get network :weight-output) ah output-deltas)
 	wi (get network :weight-input)
 	wo (get network :weight-output)
 	ci (get network :change-input)
 	co (get network :change-output)
+	output-deltas (map (fn [o e] (* e (activation-function-derivation o))) ao error)
+	hidden-deltas (calculate-hidden-deltas wo ah output-deltas)
 	updated-output-weights (update-weights wo output-deltas co ah)
-	updated-input-weights (update-weights wi hidden-deltas ci pattern)]
-    (println updated-input-weights)
-    (println updated-output-weights)
+	updated-input-weights (update-weights wi hidden-deltas ci ao)]
+
     (struct bp-nn
 	    (first  updated-input-weights)
 	    (first  updated-output-weights)
 	    (second updated-input-weights)
 	    (second updated-output-weights))
   ))
+
+(defn run-patterns
+  [network samples expecteds]
+  (if (empty? samples)
+    network
+    (let [expected (first expecteds)
+	  sample (first samples)
+	  [ah ao] (run-network sample network)
+	  updated-network (back-propagate expected (conj sample 1) [ao ah] network)]
+      (recur updated-network (rest samples) (rest expecteds)))))
+
+(defn train-network
+  ([samples expected iterations]
+     (train-network (create-network (count (first samples)) num-hidden (count (first expected))) samples expected iterations))
+  ([network samples expected iterations]
+     (if (zero? iterations)
+       network
+       (train-network (run-patterns network samples expected) samples expected (dec iterations)))))
 
 (comment 
 (defn example[]

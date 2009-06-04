@@ -1,4 +1,5 @@
 (ns uk.co.fatvat.mlperceptron
+  (:use clojure.contrib.test-is)
   (:use [uk.co.fatvat.utils]))
 
 (def activation-function (fn [x] (Math/tanh x)))
@@ -26,14 +27,19 @@
   (+ (rand (- h l)) l))
 
 (defn create-network
-  [input hidden output]
+  ([input hidden output]
+     (create-network input hidden output true))
+  ([input hidden output use-random-weights]
   "Create a network with the given number of input, hidden and output nodes"
-  (let [i (inc input)] ;; bias term
+  (let [i (inc input)
+	w-func (if use-random-weights (fn [_] (rand-range -0.2 0.2)) (fn [_] 0.2))
+	o-func (if use-random-weights (fn [_] (rand-range -2.0 2.0)) (fn [_] 2.0))]
     (struct bp-nn
-	    (matrix-map (make-matrix i hidden) (fn [_] 0.2))      ;; TODO random range
-	    (matrix-map (make-matrix hidden output) (fn [_] 2.0)) ;; TODO random range
+	    (matrix-map (make-matrix i hidden) w-func)
+	    (matrix-map (make-matrix hidden output) o-func)
 	    (make-matrix i hidden)
-	    (make-matrix hidden output))))
+	    (make-matrix hidden output)))))
+
 
 (defn apply-activation-function
   [wi pattern]
@@ -47,7 +53,6 @@
   (let [errors (map (partial reduce +) (map (fn [x] (map (fn [y z] (* y z)) x od)) wo))] ;; Sick.
     (map (fn [h e] (* e (activation-function-derivation h))) ah errors)))
     
-
 (defn update-weights
   [w deltas co ah]
   (let [x (map 
@@ -63,7 +68,7 @@
   [pattern network]
   "Run the network with the given pattern and return the output and the hidden values"
   (assert (= (count pattern) (dec (count (get network :weight-input)))))
-  (let [p (conj pattern 1)] ;; ensure bias term added
+  (let [p (cons 1 pattern)] ;; ensure bias term added
     (let [wi (get network :weight-input)
 	  wo (get network :weight-output)
 	  ah (apply-activation-function wi p)
@@ -74,7 +79,7 @@
   [target p results network]
   "Back propagate the results to adjust the rates"
   (assert (= (count target) (count (first (get network :weight-output)))))
-  (let [pattern (conj p 1) ;; ensure bias term added
+  (let [pattern (cons 1 p) ;; ensure bias term added
 	ao (first results)
 	ah (second results)
 	error (map - target ao)
@@ -85,8 +90,7 @@
 	output-deltas (map (fn [o e] (* e (activation-function-derivation o))) ao error)
 	hidden-deltas (calculate-hidden-deltas wo ah output-deltas)
 	updated-output-weights (update-weights wo output-deltas co ah)
-	updated-input-weights (update-weights wi hidden-deltas ci pattern)]
-
+	updated-input-weights (update-weights wi hidden-deltas ci pattern)] ;; order of these arguments?
     (struct bp-nn
 	    (first  updated-input-weights)
 	    (first  updated-output-weights)
@@ -101,7 +105,7 @@
     (let [expected (first expecteds)
 	  sample (first samples)
 	  [ah ao] (run-network sample network)
-	  updated-network (back-propagate expected (conj sample 1) [ao ah] network)]
+	  updated-network (back-propagate expected sample [ah ao] network)]
       (recur updated-network (rest samples) (rest expecteds)))))
 
 (defn train-network
@@ -112,11 +116,45 @@
        network
        (train-network (run-patterns network samples expected) samples expected (dec iterations)))))
 
-(comment 
 (defn example[]
-  (let [x (apply train-network (conj xor-test-data 10))]
+  (let [x (apply train-network (conj xor-test-data 100))]
     (println (first (run-network [0 0] x)) "-->" 0)
     (println (first (run-network [0 1] x)) "-->" 1)
     (println (first (run-network [1 0] x)) "-->" 1)
-    (println (first (run-network [1 1] x)) "-->" 0))))
+    (println (first (run-network [1 1] x)) "-->" 0)))
+
+(deftest test-npp
+  
+  ; Basics of creating a network
+  (is (= 3 (count (get (create-network 2 2 1) :weight-input))))
+  (is (= 2 (count (first (get (create-network 2 2 1) :weight-input)))))
+  
+  ; Basics of running a neural network
+  (is (= '(0.5370495669980354 0.5370495669980354) (apply-activation-function [[0.2 0.2] [0.2 0.2] [0.2 0.2]] [1 1 1]))) ;; TODO tolerant equals
+  (is (= '(0.8617231593133063) (apply-activation-function [[2.0][2.0]] [0.5 0.15])))
+  
+  ; Back propagation algorithm
+  (let [ao [0.5]
+	target [1.0]
+	error (map - target ao)
+	wo [[2.0][2.0]]
+	ah [0.5 0.75]
+	od [0.375]
+	wi [[0.2 0.2][0.2 0.2][0.2 0.2]]
+	pattern [1.0 1.0 1.0]
+	ci [[0.8 0.8][0.8 0.8][0.8 0.8]]
+	co [[0.6][0.6]]
+	hidden-deltas [0.5625 0.328125]]
+	    
+    (is (= [0.375] (map (fn [o e] (* e (activation-function-derivation o))) ao error))) ;; output-deltas
+    (is (= [0.5625, 0.328125] (calculate-hidden-deltas wo ah od))) ;;hidden deltas
+    (is (= '((0.56125 0.4440625) (0.56125 0.4440625) (0.56125 0.4440625)) ;; update input
+	   (first (update-weights wi hidden-deltas ci pattern))))
+    (is (= [[0.5625 0.328125] [0.5625 0.328125] [0.5625 0.328125]] ;; update input
+	   (second (update-weights wi hidden-deltas ci pattern))))
+    (is (= [[2.15375][2.200625]]
+	   (first (update-weights wo od co ah))))
+    (is (= [[0.1875][0.28125]]
+	   (second (update-weights wo od co ah)))))
+)
 			     

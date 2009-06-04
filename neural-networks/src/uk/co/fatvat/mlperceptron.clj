@@ -4,8 +4,8 @@
 
 (def activation-function (fn [x] (Math/tanh x)))
 (def activation-function-derivation (fn [y] (- 1.0 (* y y))))
-(def num-hidden 10)
 
+(def num-hidden 2)
 (def learning-rate 0.5)
 (def momentum 0.1)
 
@@ -40,17 +40,10 @@
 	    (make-matrix i hidden)
 	    (make-matrix hidden output)))))
 
-
-(defn apply-activation-function
-  [wi pattern]
-  "Calculate the hidden activations"
-  (apply map (comp activation-function +) (map (fn [col p] (map (fn [row] (* row p)) col)) wi pattern)))
-
-;; TODO this doesn't look quite right...
 (defn calculate-hidden-deltas
   [wo ah od]
   "Calculate the error terms for the hidden"
-  (let [errors (map (partial reduce +) (map (fn [x] (map (fn [y z] (* y z)) x od)) wo))] ;; Sick.
+  (let [errors (map (partial reduce +) (map (fn [x] (map * x od)) wo))] ;; Sick.
     (map (fn [h e] (* e (activation-function-derivation h))) ah errors)))
     
 (defn update-weights
@@ -63,6 +56,11 @@
 		  wcol ccol deltas))
 	   w co ah)]
     [(matrix-map x first) (matrix-map x second)]))
+
+(defn apply-activation-function
+  [w i]
+  "Calculate the hidden activations"
+  (apply map (comp activation-function +) (map (fn [col p] (map (fn [row] (* row p)) col)) w i)))
 
 (defn run-network
   [pattern network]

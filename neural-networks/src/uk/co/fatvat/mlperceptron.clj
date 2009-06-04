@@ -60,7 +60,7 @@
 (defn apply-activation-function
   [w i]
   "Calculate the hidden activations"
-  (apply map (comp activation-function +) (map (fn [col p] (map (fn [row] (* row p)) col)) w i)))
+  (apply map (comp activation-function +) (map (fn [col p] (map (partial * p) col)) w i)))
 
 (defn run-network
   [pattern network]

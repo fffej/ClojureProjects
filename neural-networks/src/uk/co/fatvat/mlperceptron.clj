@@ -65,10 +65,10 @@
 (defn run-network
   [pattern network]
   "Run the network with the given pattern and return the output and the hidden values"
-  (assert (= (count pattern) (dec (count (get network :weight-input)))))
+  (assert (= (count pattern) (dec (count (network :weight-input)))))
   (let [p (cons 1 pattern)] ;; ensure bias term added
-    (let [wi (get network :weight-input)
-	  wo (get network :weight-output)
+    (let [wi (network :weight-input)
+	  wo (network :weight-output)
 	  ah (apply-activation-function wi p)
 	  ao (apply-activation-function wo ah)]
       [ao ah])))
@@ -81,14 +81,14 @@
 	ao (first results)
 	ah (second results)
 	error (map - target ao)
-	wi (get network :weight-input)
-	wo (get network :weight-output)
-	ci (get network :change-input)
-	co (get network :change-output)
+	wi (network :weight-input)
+	wo (network :weight-output)
+	ci (network :change-input)
+	co (network :change-output)
 	output-deltas (map (fn [o e] (* e (activation-function-derivation o))) ao error)
 	hidden-deltas (calculate-hidden-deltas wo ah output-deltas)
 	updated-output-weights (update-weights wo output-deltas co ah)
-	updated-input-weights (update-weights wi hidden-deltas ci pattern)] ;; order of these arguments?
+	updated-input-weights (update-weights wi hidden-deltas ci pattern)]
     (struct bp-nn
 	    (first  updated-input-weights)
 	    (first  updated-output-weights)
@@ -107,15 +107,15 @@
       (recur updated-network (rest samples) (rest expecteds)))))
 
 (defn train-network
-  ([samples expected iterations]
-     (train-network (create-network (count (first samples)) num-hidden (count (first expected))) samples expected iterations))
-  ([network samples expected iterations]
-     (if (zero? iterations)
-       network
-       (train-network (run-patterns network samples expected) samples expected (dec iterations)))))
+  ([samples expected]
+     (train-network (create-network (count (first samples)) 
+				    num-hidden (count (first expected))) 
+		    samples expected))
+  ([network samples expected]
+     (iterate (fn [n] (run-patterns n samples expected)) network)))
 
 (defn example[]
-  (let [x (apply train-network (conj xor-test-data 100))]
+  (let [x (first (take 1 (drop 100 (apply train-network xor-test-data))))]
     (println (first (run-network [0 0] x)) "-->" 0)
     (println (first (run-network [0 1] x)) "-->" 1)
     (println (first (run-network [1 0] x)) "-->" 1)
@@ -124,8 +124,8 @@
 (deftest test-npp
   
   ; Basics of creating a network
-  (is (= 3 (count (get (create-network 2 2 1) :weight-input))))
-  (is (= 2 (count (first (get (create-network 2 2 1) :weight-input)))))
+  (is (= 3 (count ((create-network 2 2 1) :weight-input))))
+  (is (= 2 (count (first ((create-network 2 2 1) :weight-input)))))
   
   ; Basics of running a neural network
   (is (= '(0.5370495669980354 0.5370495669980354) (apply-activation-function [[0.2 0.2] [0.2 0.2] [0.2 0.2]] [1 1 1]))) ;; TODO tolerant equals
@@ -153,6 +153,5 @@
     (is (= [[2.15375][2.200625]]
 	   (first (update-weights wo od co ah))))
     (is (= [[0.1875][0.28125]]
-	   (second (update-weights wo od co ah)))))
-)
+	   (second (update-weights wo od co ah))))))
 			     

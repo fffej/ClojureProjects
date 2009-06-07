@@ -115,7 +115,7 @@
      (iterate (fn [n] (run-patterns n samples expected)) network)))
 
 (defn example[]
-  (let [x (first (take 1 (drop 100 (apply train-network xor-test-data))))]
+  (let [x (nth (apply train-network xor-test-data) 100)]
     (println (first (run-network [0 0] x)) "-->" 0)
     (println (first (run-network [0 1] x)) "-->" 1)
     (println (first (run-network [1 0] x)) "-->" 1)

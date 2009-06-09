@@ -98,13 +98,13 @@
 
 (defn run-patterns
   [network samples expecteds]
-  (if (empty? samples)
-    network
-    (let [expected (first expecteds)
-	  sample (first samples)
-	  [ah ao] (run-network sample network)
-	  updated-network (back-propagate expected sample [ah ao] network)]
-      (recur updated-network (rest samples) (rest expecteds)))))
+  (reduce 
+   (fn [n expectations] 
+     (let [[sample expected] expectations
+	   [ah ao] (run-network sample n)]
+       (back-propagate expected sample [ah ao] n)))   
+   network ;; initial value
+   (map list samples expecteds)))  
 
 (defn train-network
   ([samples expected]

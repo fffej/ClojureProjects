@@ -1,6 +1,9 @@
 ;;; Implementation of a simplified General Problem Solver
 ;;; http://en.wikipedia.org/wiki/General_Problem_Solver
 ;;; Based on code in "Paradigms of Artificial Intelligence Programming"
+
+;; TODO There is a problem preserving order.
+
 (ns uk.co.fatvat.gps2
   (:use [clojure.contrib.set])
   (:use [clojure.set]))
@@ -44,12 +47,15 @@
   "Is x of the form: (executing ...)?"
   (and (seq? x) (= 'executing (first x))))
 
-;; TODO THIS FUNCTION IS WRONG
 (defn convert-op
   [op]
   "Make op conform the the (EXECUTING op) convention"
   (if-not (some executing? (:add-list op))
-    (struct operation (:action op) (:preconditions op) (set (conj (:add-list op) 'executing)) (:del-list op))
+    (struct operation 
+	    (:action op) 
+	    (:preconditions op) 
+	    (set (conj (:add-list op) (list 'executing (:action op))))
+	    (:del-list op))
     op))
 
 (defn make-op
@@ -95,36 +101,12 @@
       @current-state)))
 
 
-(def example-operations
-     [(make-op 'message-friends
-	       #{'have-facebook}
-	       #{'friends-emailed}
-	       #{'at-home})
-
-      (make-op 'arrange-party
-	       #{'friends-emailed}
-	       #{'party-arranged}
-	       #{})
-
-      (make-op 'get-on-bus
-	       #{'party-arranged}
-	       #{'at-club}
-	       #{})
-      
-      (make-op 'drink
-	       #{'have-drink}
-	       #{'had-drink}
-	       #{'have-drink})
-
-      (make-op 'dance
-	       #{'had-drink}
-	       #{'dancing}
-	       #{})
-
-      (make-op 'give-bar-money
-	       #{'have-money 'at-club}
-	       #{'bar-has-money 'have-drink}
-	       #{'have-money})])
+(defn GPS
+  [state goals ops]
+  "General Problem Solver: from state, achieve using ops"
+  (dosync
+   (ref-set *ops* ops))
+  (remove (comp not sequential?) (achieve-all (set (cons (list 'start) state)) goals [])))
 
 (def school-ops
     [(make-op 'drive-son-to-school
@@ -157,16 +139,41 @@
          #{'shop-has-money}
          #{'have-money})])
 
-
-(defn GPS
-  [state goals ops]
-  "General Problem Solver: from state, achieve using ops"
-  (dosync
-   (ref-set *ops* ops))
-  (remove (comp list?) (achieve-all (set (cons (list 'start) state)) goals [])))
-
 (defn school-example
   []
   (GPS #{'son-at-home 'car-needs-battery 'have-money 'have-phone-book}
        #{'son-at-school}
        school-ops))
+
+(def banana-ops
+     [
+      (make-op 'climb-on-chair
+	       #{'chair-at-middle-room 'at-middle-room 'on-floor}
+	       #{'at-bananas 'on-chair}
+	       #{'at-middle-room 'on-floor})
+      (make-op 'push-chair-from-door-to-middle-room
+	       #{'chair-at-door 'at-door}
+	       #{'chair-at-middle-room 'at-middle-room}
+	       #{'chair-at-door 'at-door})
+      (make-op 'walk-from-door-to-middle-room
+	       #{'at-door 'on-floor}
+	       #{'at-middle-room}
+	       #{'at-door})
+      (make-op 'grasp-bananas
+	       #{'at-bananas 'empty-handed}
+	       #{'has-bananas}
+	       #{'empty-handed})
+      (make-op 'drop-ball
+	       #{'has-ball}
+	       #{'empty-handed}
+	       #{'has-ball})
+      (make-op 'eat-bananas
+	       #{'has-bananas}
+	       #{'empty-handed 'not-hungry}
+	       #{'has-bananas 'hungry})])
+
+(defn money-and-bananas
+  []
+  (GPS #{'at-door 'on-floor 'has-ball 'hungry 'chair-at-door}
+       #{'not-hungry}
+       banana-ops))

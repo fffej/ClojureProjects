@@ -2,10 +2,7 @@
 ;;; http://en.wikipedia.org/wiki/General_Problem_Solver
 ;;; Based on code in "Paradigms of Artificial Intelligence Programming"
 
-;; TODO There is a problem preserving order.
-
 (ns uk.co.fatvat.gps2
-  (:use [clojure.contrib.set])
   (:use [clojure.set]))
 
 (defstruct operation :action :preconditions :add-list :del-list)
@@ -86,10 +83,15 @@
   (dbg-indent :gps (count goal-stack) "Goal: %s" goal)
 
   (cond
-    (state goal) state
+    (contains-value? state goal) state
     (contains-value? goal-stack goal) nil
-    :else (set (some (fn [op] (apply-op state goal op goal-stack))
-		     (filter (fn [x] (appropriate? goal x)) @*ops*)))))
+    :else (some (fn [op] (apply-op state goal op goal-stack))
+		(filter (fn [x] (appropriate? goal x)) @*ops*))))
+
+(defn sequential-subset?
+  [s1 s2]
+  (and (<= (count s1) (count s2))
+       (every? (fn [x] (contains-value? s2 x)) s1)))
 
 (defn achieve-all 
   [state goals goal-stack]
@@ -97,7 +99,7 @@
   (let [current-state (atom state)]
     (if (and (every? (fn [g] (swap! current-state 
 				    (fn [s] (achieve s g goal-stack)))) goals)
-	     (subset? goals @current-state))
+	     (sequential-subset? goals @current-state))
       @current-state)))
 
 
@@ -106,7 +108,7 @@
   "General Problem Solver: from state, achieve using ops"
   (dosync
    (ref-set *ops* ops))
-  (remove (comp not sequential?) (achieve-all (set (cons (list 'start) state)) goals [])))
+  (remove (comp not sequential?) (achieve-all (cons (list 'start) state) goals [])))
 
 (def school-ops
     [(make-op 'drive-son-to-school
@@ -172,7 +174,7 @@
 	       #{'empty-handed 'not-hungry}
 	       #{'has-bananas 'hungry})])
 
-(defn money-and-bananas
+(defn monkey-and-bananas
   []
   (GPS #{'at-door 'on-floor 'has-ball 'hungry 'chair-at-door}
        #{'not-hungry}

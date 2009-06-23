@@ -1,6 +1,10 @@
 ;;; Eliza example from Paradigms of AI Programming (Norvig)
 ;;; jeff.foster.acm.org
 (ns uk.co.fatvat.eliza
+  (:import [javax.swing JFrame JTextField JLabel JPanel BoxLayout])
+  (:import [java.awt.event ActionListener KeyAdapter KeyEvent])
+  (:import [java.awt GridLayout])
+  (:import [java.io StringReader PushbackReader])
   (:use [clojure.contrib.test-is]))
 
 (defn position
@@ -120,13 +124,48 @@
   [input]
   (some (fn [rule]
 	  (let [result (pat-match (rule-pattern rule) input)]
-	    (println (rule-responses rule))
-	    (println (switch-viewpoint result))
 	    (when-not (= result fail)
-	      (replace (switch-viewpoint result)
-		       (random-elt (rule-responses rule))))))*eliza-rules*))
+	      (replace (into {} (switch-viewpoint result))
+		       (random-elt (rule-responses rule)))))) *eliza-rules*))
 
-;; Oh bum.  I now need to replace this with hash maps
+(defn read-symbol 
+  "Read a single symbol from a string returning nil on failure"
+  [s]
+  (read s false nil))
+
+(defn get-response 
+  "Get a response from the given string"
+  [s]
+  (with-open [r (PushbackReader. (StringReader. s))]
+    (let [x (doall (take-while #(not (nil? %)) (repeatedly #(read-symbol r))))]
+      (use-eliza-rules x))))
+
+(defn eliza-ui []
+  (let [frame (JFrame. "Eliza")
+	pane (JPanel.)
+	user-input (JTextField.)
+	eliza-output (JLabel. "")
+	key-handler (proxy [KeyAdapter] []
+		      (keyReleased [keyEvent]
+				  (when (= (KeyEvent/VK_ENTER) (.getKeyCode keyEvent))
+				    (let [input (.getText user-input)]
+				      (.setText user-input "")
+				      (.setText eliza-output (apply str 
+								    (interleave 
+								     (get-response input)
+								     (repeat \space))))))))]
+    (.addKeyListener user-input key-handler)
+    (doto pane
+      (.setLayout (BoxLayout. pane BoxLayout/Y_AXIS))
+      (.add (JLabel. "Eliza - How may I help?"))
+      (.add user-input)
+      (.add (JLabel. "Listen:"))
+      (.add eliza-output))
+    (doto frame
+      (.add pane)
+      (.setSize 300 300)
+      (.setVisible true))))
+
 (def *eliza-rules*
  '((((?* ?x) hello (?* ?y))      
     (How do you do.  Please state your problem.))

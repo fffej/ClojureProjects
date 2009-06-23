@@ -93,11 +93,40 @@
 							   '(Mr Hulot and I need a vacation))))
   (is (= '{?X (1 2 a b)} (pat-match '((?* ?X) a b (?* ?X)) '(1 2 a b a b 1 2 a b)))))
 
-;; Because we don't have dotted pairs, this test will fail.  This will be addressed
-;; in improved versions
-;;  (is (= '{(?X a long vacation) (?P I)} (pat-match '(?P need . ?X) '(i need a long vacation)))))
+;; Because we want ordering I've gone for the standard list approach used in the PAIP book
+;; An alternative would be to define a sorted-map with keys having some kind of priority
+(defn rule-pattern
+  [rule]
+  (first rule))
 
+(defn rule-responses
+  [rule]
+  (rest rule))
 
+(declare *eliza-rules*)
+
+(defn switch-viewpoint
+  "Change I to you and vice versa, and so on."
+  [words]
+  (let [substitutions '{I you, you I, me you, am are}]
+    (replace substitutions words)))
+
+(defn random-elt
+  [x]
+  (nth x (rand-int (count x))))
+
+(defn use-eliza-rules
+  "Find a rule to transform the input"
+  [input]
+  (some (fn [rule]
+	  (let [result (pat-match (rule-pattern rule) input)]
+	    (println (rule-responses rule))
+	    (println (switch-viewpoint result))
+	    (when-not (= result fail)
+	      (replace (switch-viewpoint result)
+		       (random-elt (rule-responses rule))))))*eliza-rules*))
+
+;; Oh bum.  I now need to replace this with hash maps
 (def *eliza-rules*
  '((((?* ?x) hello (?* ?y))      
     (How do you do.  Please state your problem.))

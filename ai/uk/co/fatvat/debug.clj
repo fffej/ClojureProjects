@@ -6,7 +6,7 @@
 (defn dbg 
   "Print debugging info if (DEBUG id) has been specified"
   [id format-string & args]
-  (when (contains? id @*dbg-ids*)
+  (when (@*dbg-ids* id)
     (println (format format-string args))))
 
 (defn debug

@@ -152,7 +152,7 @@
 				      (.setText user-input "")
 				      (.setText eliza-output (apply str 
 								    (interleave 
-								     (get-response input)
+								     (doall (get-response input))
 								     (repeat \space))))))))]
     (.addKeyListener user-input key-handler)
     (doto pane

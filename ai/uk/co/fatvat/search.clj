@@ -81,31 +81,84 @@
 ;;; the case where we have a queen + king against a single king.
 ;;; What's the best route to mate?
 
-;; A board consists of the pieces on it
-(defstruct position :x :y)
-
-(defstruct board :white-queen :white-king :black-king :white-turn?)
-
-(def moves
-     #{[1 1] [1 0] [1 -1] [0 1] [0 -1] [-1 1] [-1 0] [-1 -1]})
-     
-(defn checked-or-invalidmove?
-  [white-king white-queen black-king]
-  true)
-
 (defn add-vec
   [pos delta]
   (map + pos delta))
 
-(defn mate?
+;; A board consists of the pieces on it
+(defstruct board :white-queen :white-king :black-king :white-turn?)
+
+;; Valid moves that a queen or king can make
+(def directions
+     #{[1 1] [1 0] [1 -1] [0 1] [0 -1] [-1 1] [-1 0] [-1 -1]})
+
+(defn valid-position?
+  "Is the supplied position on the chess board?"
+  [pos]
+  (let [x (first pos) y (second pos)]
+    (and (>= x 0) (< x 8) (>= y 0) (< y 8))))
+
+(defn queen-checked?
+  "Does the queen check the king?"
+  [[qx qy] [kx ky]]
+  (or (= qx kx) 
+      (= qy ky)
+      (= (Math/abs (- qx kx)) (Math/abs (- qy ky)))))
+
+(defn adjacent?
+  "Are the two pieces next to each other?"
+  [[x1 y1] [x2 y2]]
+  (let [d1 (Math/abs (- x1 x2))
+	d2 (Math/abs (- y1 y2))]
+    (and (<= d1 1) (<= d2 1))))
+
+(defn queen-moves
+  [queen]
+  (set
+   (mapcat
+    (fn [delta] (take-while valid-position? (iterate (partial add-vec delta) queen)))
+    directions)))
+
+(defn valid-board?
   [board]
-  (if (:white-turn? board)
-    false
-    (every? (partial 
-	     checked-or-invalidmove?
-	     (:white-king board)
-	     (:white-queen board))
-	    (map (partial add-vec (:black-king board)) moves))))
+  (let [wk (:white-king board)
+	wq (:white-queen board)
+	bk (:black-king board)]
+    (and
+     (every? valid-position? [wk wq bk])
+     (not (queen-checked? wq bk))
+     (not (adjacent? wk bk))
+     (= 3 (count #{wk wq bk})))))
+
+(defn next-moves
+  "The set of next states"
+  [b]
+  (let [wk (:white-king b)
+	wq (:white-queen b)
+	bk (:black-king b)]
+    (filter valid-board?
+	    (if (:white-turn? b)
+	      (concat
+	       (map (fn [x] (struct board x wk bk false)) (queen-moves wq))
+	       (map (fn [x] (struct board (add-vec wk x) wq bk false)) directions))
+	      (map (fn [x] (struct board wk wq (add-vec bk x) true)) directions)))))
+		    
+(defn check-mate?
+  [board]
+  (let [wk (:white-king board)
+	wq (:white-queen board)
+	bk (:black-king board)]
+    (println "BOARD=" board)
+    (if (:white-turn? board)
+      false
+      (and
+       (queen-checked? wq bk)
+       (every? (partial queen-checked? wq)
+	       (filter valid-position? (map (partial add-vec bk) directions)))))))
+
+(defn calculate-mate
+  [b]
+  (breadth-first-search b check-mate? next-moves))
 	     
 
 

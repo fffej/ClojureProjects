@@ -79,11 +79,9 @@
 	  
 (defn read-data
   [image pc]
-  (if (>= pc (count image))
-    nil
-    (let [ins (get-instruction-data image pc)]
-      (println "Instruction: =" ins)
-      (recur image (+ pc 12)))))
+  (map (fn [x] (get-instruction-data image x)) (range 0 (count image) 12)))
+
   
+
 	   
 	

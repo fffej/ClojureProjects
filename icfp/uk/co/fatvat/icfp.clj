@@ -47,31 +47,32 @@
 		    bytes
 		    (range 0 32 8)))))
 
-(defn get-op-code
+(defn get-op
   [ins]
   (let [d-opcode (bit-shift-right (bit-and 0xF0 (last ins)) 4)
 	s-opcode (bit-and 0x0F (last ins))]
     (if (zero? d-opcode)
-      (s-type-instructions s-opcode)
-      (d-type-instructions d-opcode))))
+      [(s-type-instructions s-opcode)]
+      [(d-type-instructions d-opcode) (d-args ins)])))
 
-(defn decode-instruction
+;;; Why is not the first shift working?
+(defn d-args
   [ins]
-  (let [opcode (get-op-code ins)]
-    [opcode]))
+  (let [x (to-int ins)]
+    [(bit-shift-right (bit-and x 0x003FFF0000) 14) (bit-and x 0x00003FFF)]))
 
 (defn get-instruction-data
   [image address]
   (if (even? (/ address 12))
-    [(decode-instruction (subvec image (+ address 8) (+ address 8 4)))
+    [(get-op (subvec image (+ address 8) (+ address 8 4)))
      (to-double (subvec image address (+ address 8)))]
 
-    [(decode-instruction (subvec image address (+ address 4)))
+    [(get-op (subvec image address (+ address 4)))
      (to-double (subvec image (+ address 4) (+ address 12)))]))
 	  
 (defn read-data
   [image pc]
-  (println "Program counter: " (/ pc 12))
+  ;(println "Program counter: " (/ pc 12))
   (if (>= pc 144) ;(count image))
     nil
     (let [ins (get-instruction-data image pc)]

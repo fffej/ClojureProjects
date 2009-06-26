@@ -52,14 +52,21 @@
   (let [d-opcode (bit-shift-right (bit-and 0xF0 (last ins)) 4)
 	s-opcode (bit-and 0x0F (last ins))]
     (if (zero? d-opcode)
-      [(s-type-instructions s-opcode)]
+      (let [sins (s-type-instructions s-opcode)]
+	[sins (s-args sins ins)])
       [(d-type-instructions d-opcode) (d-args ins)])))
 
-;;; Why is not the first shift working?
 (defn d-args
   [ins]
   (let [x (to-int ins)]
-    [(bit-shift-right (bit-and x 0x003FFF0000) 14) (bit-and x 0x00003FFF)]))
+    [(bit-shift-right (bit-and x 0xFFFC000) 14) (bit-and x 0x00003FFF)]))
+
+(defn s-args
+  [op ins]
+  (if (= 'Cmpz op)
+    [(comparison (bit-shift-right (bit-and (to-int ins) 0x700000) 21)) (bit-and (to-int ins) 0x00003FFF)]
+    [(bit-and (to-int ins) 0x00003FFF)
+     (bit-shift-right (bit-and (last (butlast ins)) 0xF0) 4)]))
 
 (defn get-instruction-data
   [image address]
@@ -72,8 +79,7 @@
 	  
 (defn read-data
   [image pc]
-  ;(println "Program counter: " (/ pc 12))
-  (if (>= pc 144) ;(count image))
+  (if (>= pc (count image))
     nil
     (let [ins (get-instruction-data image pc)]
       (println "Instruction: =" ins)

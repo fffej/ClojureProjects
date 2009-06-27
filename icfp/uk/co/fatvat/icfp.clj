@@ -16,9 +16,9 @@
   "D-type General numeric op"
   [vm [x y] f]
   (let [m (:mem vm)]
-    (ref-set (m @(:counter vm)) (f @(m x) @(m y))))
+    (swap! (m @(:counter vm)) (fn [_] (f @(m x) @(m y))))))
 
-(def *trace-enabled* (ref false))
+(def *trace-enabled* (atom false))
 
 (defn trace
   ([vm op]
@@ -33,7 +33,8 @@
   [vm [x y]]
   (let [m (:mem vm)]
     (trace vm 'Phi (format "%s ? %s : %s --> %s" @(:status vm) @(m x) @(m y) (if @(:status vm) @(m x) @(m y))))
-    (ref-set (m @(:counter vm))
+    (swap! (m @(:counter vm))
+	   (fn [_]
 	     (if @(:status vm)
 	       @(m x)
 	       @(m y))))))
@@ -76,26 +77,26 @@
   "S-Type: Copy instruction"
   [vm [x]]
   (trace vm 'Copy (format "%s // %s" x (get-val vm x)))
-  (ref-set ((:mem vm) @(:counter vm)) (get-val vm x)))
+  (swap! ((:mem vm) @(:counter vm)) (fn [_] (get-val vm x))))
 
 (defn sqrt
   "S-Type: Square root instruction: undefined for negative values"
   [vm [x]]
   (trace vm 'Sqrt)
   (assert (not (neg? (get-val vm x))))
-  (ref-set ((:mem vm) @(:counter vm)) (Math/sqrt (get-val vm x))))
+  (swap! ((:mem vm) @(:counter vm)) (fn [_] (Math/sqrt (get-val vm x)))))
 
 (defn input
   "S-Type: Set the memory from the inport"
   [vm args]
   (trace vm 'Input)
-  (ref-set ((:mem vm) @(:counter vm)) @((:inport vm) (first args))))
+  (swap! ((:mem vm) @(:counter vm)) (fn [_] @((:inport vm) (first args)))))
 
 (defn output
   "Output instruction: Set the memory on the outport"
   [vm [x y]]
   (trace vm 'Output (format "%s %s // %s" x y (get-val vm y)))
-  (ref-set ((:outport vm) x)  (get-val vm y)))
+  (swap! ((:outport vm) x) (fn [_] (get-val vm y))))
 
 (defn cmpz
   "Comparison function"
@@ -109,7 +110,7 @@
 		 (= cmp 'GTZ) (>= val 0)
 		 :else (assert false))]
     (trace vm 'Cmpz (format "%s %s --> %s" cmp y status))
-    (ref-set (:status vm) status)))
+    (swap! (:status vm) (fn [_] status))))
 
 (def d-type-instructions {1 add, 2 sub, 3 mult, 4 div, 5 output, 6 phi})
 (def s-type-instructions {0 noop, 1 cmpz, 2 sqrt, 3 copy, 4 input})
@@ -207,19 +208,19 @@
   (* (Math/sqrt (/ GM r2)) (- 1 (Math/sqrt (/ (* 2 r1) (+ r1 r2))))))
 
 ;;; Virtual machine executing instructions
-(defn vector-refs
+(defn vector-atoms
   "Create a vector of references, initialized to zero"
   [n]
-  (into [] (take n (repeatedly #(ref 0)))))
+  (into [] (take n (repeatedly #(atom 0)))))
 
 (defn init-vm
   [data]
-  (let [memory (vector-refs (count data))]
+  (let [memory (vector-atoms (count data))]
     (dosync
-     (doall (map ref-set memory data)))
-    (struct virtualmachine memory (ref 0) (vector-refs 16384) (vector-refs 16384) (ref false))))
+     (doall (map (fn [a d] (swap! a (fn [_] d))) memory data)))
+    (struct virtualmachine memory (atom 0) (vector-atoms 16384) (vector-atoms 16384) (atom false))))
 
-(defn hohmann-trace
+(defn hohmann-score
   [vm]
   (let [x (:outport vm)
 	pc @(:counter vm)
@@ -230,20 +231,28 @@
 	target-radius @(x 4)]
     [pc score fuel-remaining sx-relative sy-relative target-radius]))
     
-(defn hohmann-input 
-  [c vm]
-  (println "Running with config: " c)
-  (dosync (ref-set ((:inport vm) 0x3E80) c)))
+(defn hohmann-updater 
+  [vm]
+  (if (zero? @(:counter vm))
+    (swap! ((:inport vm) 0x3E80) (fn [_] 1001))))
+
+(defn create-vm
+  [instructions]
+  (init-vm (map second instructions)))
+
+(def bin1 (read-data (get-bytes bin1)))
 
 (defn run-machine
   "Run the virtual machine with the decoded instructions"
-  [instructions tracer init-input]
-  (let [vm (init-vm (map second instructions))]
-    (init-input vm)
-    (dosync
-     (doseq [instruction instructions]     
-       (let [[op args] (first instruction)]
-	 (apply op (list vm args)) ;; dodgy side effect
-	 (alter (:counter vm) inc))))
-    (tracer vm)))
+  [vm ops update-input]
+  (update-input vm)
+  (doseq [[op args] ops]     
+    (apply op (list vm args)) ;; dodgy side effect
+    (swap! (:counter vm) inc))
+  vm)
 
+(defn run []
+  (let [x (create-vm bin1)
+	ops (map first bin1)]
+    (run-machine x ops hohmann-updater)
+    (run-machine x ops hohmann-updater)))			

@@ -159,7 +159,7 @@
 	  
 (defn read-data
   "Read in the data from the image and return a series of decoded instructions"
-  [image pc]
+  [image]
   (map (fn [x] (get-instruction-data image x)) (range 0 (count image) 12)))
 
 ;;; Physics functions
@@ -189,14 +189,34 @@
       (map (fn [r v] (ref-set r v)) memory data)))
     (struct virtualmachine memory (ref 0) (vector-refs 16384) (vector-refs 16384) (ref false))))
 
+(defn hohmann-trace
+  [vm]
+  (let [x (:outport vm)
+	pc @(:counter vm)
+	score @(x 0)
+	fuel-remaining @(x 1)
+	sx-relative @(x 2)
+	sy-relative @(x 3)
+	target-radius @(x 4)]
+    (println (format "%s: %s,%s,%s,%s,%s" pc score fuel-remaining sx-relative sy-relative target-radius))))
+    
+(defn hohmann-input 
+  [c vm]
+  (println "Running with config: " c)
+  (dosync
+   (ref-set ((:inport vm) 0x3E80) (double c)))
+  (println "Set to: " ((:inport vm) 0x3E80)))
+
 (defn run-machine
   "Run the virtual machine with the decoded instructions"
-  [instructions]
+  [instructions tracer init-input]
   (let [vm (init-vm (map second instructions))]
+    (init-input vm)
     (doseq [instruction instructions]     
-      (let [[op args] (first instruction) data (second instruction)]
+      (tracer vm)
+      (let [[op args] (first instruction)]
 	(apply op (list vm args))
 	(dosync
 	 (alter (:counter vm) inc))))
-    vm))
+    nil))
 	 

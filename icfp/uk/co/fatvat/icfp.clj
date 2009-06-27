@@ -31,24 +31,32 @@
 	      (if @(:status vm)
 		@(m x)
 		@(m y))))))
+
+(defn get-val
+  [vm x]
+  @((:mem vm) x))
+
+(defn print-args
+  [vm op x y]
+  (format "%s %s // %s %s %s" x y (get-val vm x) op (get-val vm y)))
     
 (defn add
   "D-type Add instruction"
   [vm [x y]]
-  (trace vm 'Add (format "%s %s" x y))
+  (trace vm 'Add (print-args vm '+ x y))
   (numeric-op vm [x y] +))
 
 (defn sub
   "D-type Sub instruction"
   [vm [x y]]
-  (trace vm 'Sub (format "%s %s" x y))
+  (trace vm 'Sub (print-args vm '- x y))
   (numeric-op vm [x y] -))
 
 (defn mult
   "D-type Multiply instruction"
-  [vm args]
-  (trace vm 'Mult)
-  (numeric-op vm args *))
+  [vm [x y]]
+  (trace vm 'Mult (print-args vm '* x y))
+  (numeric-op vm [x y] *))
 
 (defn div
   "D-type Divide"

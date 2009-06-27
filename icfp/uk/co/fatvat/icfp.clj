@@ -145,7 +145,6 @@
 		    bytes
 		    (range 0 32 8)))))
 
-
 (defn- d-args
   "Convert a D-type instruction into a vector of op-code + args"
   [ins]
@@ -157,8 +156,7 @@
   [op ins]
   (if (= cmpz op)
     [(comparison (bit-shift-right (bit-and (to-int ins) 0x700000) 21)) (bit-and (to-int ins) 0x00003FFF)]
-    [(bit-and (to-int ins) 0x00003FFF)
-     (bit-shift-right (bit-and (last (butlast ins)) 0xF0) 4)]))
+    [(bit-and (to-int ins) 0x00003FFF) (bit-shift-right (bit-and (last (butlast ins)) 0xF0) 4)]))
 
 (defn get-op
   "Decode the 4 bytes as an op code, complete with arguments"
@@ -174,7 +172,7 @@
   "Decode the data at the given address (in 96 bit multiplies)"
   [image address]
   (if (even? (/ address 12))
-    [(get-op (subvec image (+ address 8) (+ address 8 4)))
+    [(get-op (subvec image (+ address 8) (+ address 12)))
      (to-double (subvec image address (+ address 8)))]
     [(get-op (subvec image address (+ address 4)))
      (to-double (subvec image (+ address 4) (+ address 12)))]))
@@ -210,7 +208,7 @@
 
 ;;; Virtual machine executing instructions
 (defn vector-atoms
-  "Create a vector of references, initialized to zero"
+  "Create a vector of atoms, initialized to zero"
   [n]
   (into [] (take n (repeatedly #(atom 0)))))
 
@@ -249,6 +247,8 @@
 
 (def bin1 (read-data (get-bytes bin1)))
 
+;; TODO This could be purely functional, if I just returned
+;; a copy of the entire VM after each operation was applied.
 (defn run-machine
   "Run the virtual machine with the decoded instructions.  
    Reset the program counter when complete"

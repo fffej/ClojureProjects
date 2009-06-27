@@ -9,13 +9,6 @@
 (def d-type-instructions {1 'Add, 2 'Sub, 3 'Mult, 4 'Div, 5 'Output, 6 'Phi})
 (def s-type-instructions {0 'Noop, 1 'Cmpz, 2 'Sqrt, 3 'Copy, 4 'Input})
 (def comparison {0 'LTZ, 1 'LEZ, 2 'EQZ, 3 'GEZ, 4 'GTZ})
-(def header 0xCAFEBABE)
-(def team-id 125)
-
-(def op-and 1879048192)
-
-;;; Define what the virtual memory looks like
-(defstruct vm :data-memory :instruction-memory :programcounter :status)
 
 (defn get-bytes
   "Read the bytes for the given file, stored as a sequence of bytes"
@@ -80,6 +73,15 @@
 (defn read-data
   [image pc]
   (map (fn [x] (get-instruction-data image x)) (range 0 (count image) 12)))
+
+(defstruct virtualmachine :mem :inport :outport)
+
+(defn vector-refs
+  [n]
+  (into [] (take n (repeatedly #(ref 0)))))
+
+     
+    
 
   
 

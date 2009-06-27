@@ -88,9 +88,9 @@
 
 (defn input
   "S-Type: Set the memory from the inport"
-  [vm args]
+  [vm [x]]
   (trace vm 'Input)
-  (swap! ((:mem vm) @(:counter vm)) (fn [_] @((:inport vm) (first args)))))
+  (swap! ((:mem vm) @(:counter vm)) (fn [_] @((:inport vm) x))))
 
 (defn output
   "Output instruction: Set the memory on the outport"
@@ -243,12 +243,14 @@
 (def bin1 (read-data (get-bytes bin1)))
 
 (defn run-machine
-  "Run the virtual machine with the decoded instructions"
+  "Run the virtual machine with the decoded instructions.  
+   Reset the program counter when complete"
   [vm ops update-input]
   (update-input vm)
   (doseq [[op args] ops]     
     (apply op (list vm args)) ;; dodgy side effect
     (swap! (:counter vm) inc))
+  (swap! (:counter vm) (fn [_] 0))
   vm)
 
 (defn run []

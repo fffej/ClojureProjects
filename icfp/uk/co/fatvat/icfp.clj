@@ -10,6 +10,7 @@
 (def s-type-instructions {0 'Noop, 1 'Cmpz, 2 'Sqrt, 3 'Copy, 4 'Input})
 (def comparison {0 'LTZ, 1 'LEZ, 2 'EQZ, 3 'GEZ, 4 'GTZ})
 
+;;; Reading in the file from disk and bit manipulation fu
 (defn get-bytes
   "Read the bytes for the given file, stored as a sequence of bytes"
   [filename]
@@ -63,11 +64,11 @@
       [(d-type-instructions d-opcode) (d-args ins)])))
 
 (defn get-instruction-data
+  "Decode the data at the given address (in 96 bit multiplies)"
   [image address]
   (if (even? (/ address 12))
     [(get-op (subvec image (+ address 8) (+ address 8 4)))
      (to-double (subvec image address (+ address 8)))]
-
     [(get-op (subvec image address (+ address 4)))
      (to-double (subvec image (+ address 4) (+ address 12)))]))
 	  
@@ -75,6 +76,17 @@
   "Read in the data from the image and return a series of decoded instructions"
   [image pc]
   (map (fn [x] (get-instruction-data image x)) (range 0 (count image) 12)))
+
+;;; Physics functions
+(def G 6.6428e-11)
+
+(defn distance
+  "Distance between two bodies"
+  [[x1 y1] [x2 y2]]
+  (let [dx (- x1 x2) dy (- y1 y2)]
+    (Math/sqrt (+ (* dx dx) (* dy dy)))))
+
+;;; Virtual machine executing instructions
 
 (defstruct virtualmachine :mem :inport :outport :status)
 
@@ -87,7 +99,14 @@
   []
   (struct virtualmachine (vector-refs 16384) (vector-refs 16384) (vector-refs 16384) false))
 
-     
+(defn run-machine
+  "Run the virtual machine with the decoded instructions"
+  [instructions]
+  (let [vm (init-vm)]
+    (doseq [instruction instructions]
+      (let [[op args] (first instruction) data (second instruction)]
+	(println op)))))
+      
     
 
   

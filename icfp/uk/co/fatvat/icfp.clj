@@ -88,7 +88,7 @@
 
 ;;; Virtual machine executing instructions
 
-(defstruct virtualmachine :mem :inport :outport :status)
+(defstruct virtualmachine :mem :counter :inport :outport :status)
 
 (defn vector-refs
   "Create a vector of references, initialized to zero"
@@ -96,28 +96,77 @@
   (into [] (take n (repeatedly #(ref 0)))))
 
 (defn init-vm
-  []
-  (struct virtualmachine (vector-refs 16384) (vector-refs 16384) (vector-refs 16384) false))
+  [data]
+  (let [memory (vector-refs (count data))]
+    (dosync
+     (doall
+      (map (fn [ref v] (ref-set ref v)) memory data)))
+    (struct virtualmachine memory (ref 0) (vector-refs 16384) (vector-refs 16384) (ref false))))
 
+(defn noop
+  "Noop instruction"
+  [vm args]
+  vm)
+
+(defn copy
+  "Copy instruction"
+  [vm args]
+  (dosync
+   (ref-set ((:mem vm) @(:counter vm)) (first args))))
+
+(defn sqrt
+  "Square root instruction: undefined for negative values"
+  [vm args]
+  (assert (not (neg? (first args))))
+  (dosync
+   (ref-set ((:mem vm) @(:counter vm)) (Math/sqrt (first args)))))
+
+(defn input
+  "Input instruction: Set the memory on the inport"
+  [vm args]
+  (dosync
+   (ref-set ((:mem vm) @(:counter vm)) @((:inport vm) @(:counter vm)))))
+
+; {0 'LTZ, 1 'LEZ, 2 'EQZ, 3 'GEZ, 4 'GTZ})
+(defn cmpz
+  [vm args]
+  (let [cmp (first args)
+	val (second args)
+	comparator
+	(cond 
+	  (= cmp 'LTZ) (partial < 0)
+	  (= cmp 'LEZ) (partial <= 0)
+	  (= cmp 'EQZ) zero?
+	  (= cmp 'GEZ) (partial > 0)
+	  (= cmp 'GTZ) (partial >= 0)
+	  :else (assert false))]
+    4))
+	  
+  
+
+;; TODO turn the symbols into the functions.
 (defn run-machine
   "Run the virtual machine with the decoded instructions"
   [instructions]
-  (let [vm (init-vm)]
+  (let [vm (init-vm (map second instructions))]
     (doseq [instruction instructions]
       (let [[op args] (first instruction) data (second instruction)]
 	(cond 
-	  (= op 'Noop) (println "noop" args)
-	  (= op 'Cmpz) (println "cmpz" args)
-	  (= op 'Sqrt)  (println "sqrt" args)
-	  (= op 'Copy) (println "copy" args)
-	  (= op 'Input) (println "input" args)
+	  (= op 'Noop) (noop vm args)
+	  (= op 'Cmpz) (cmpz vm args) 
+	  (= op 'Sqrt) (sqrt vm args) 
+	  (= op 'Copy) (copy vm args)
+	  (= op 'Input) (input vm args)
 	  (= op 'Add) (println "add" args)
 	  (= op 'Sub) (println "sub" args)
 	  (= op 'Mult) (println "mult" args)
 	  (= op 'Div) (println "div" args)
 	  (= op 'Output) (println "output" args)
 	  (= op 'Phi) (println "phi" args)
-	  :else (assert false))))))
+	  :else (assert false)))
+      (dosync
+       (alter (:counter vm) inc)))
+    vm))
       
     
 

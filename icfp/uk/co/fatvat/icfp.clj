@@ -9,87 +9,103 @@
 (defstruct virtualmachine :mem :counter :inport :outport :status)
 
 (defn numeric-op
-  "General numeric op"
+  "D-type General numeric op"
   [vm args f]
   (dosync
    (let [m (:mem vm)]
      (ref-set (m @(:counter vm)) (f @(m (first args)) @(m (second args)))))))  
 
+(defn trace
+  ([vm op]
+     (println @(:counter vm) op))
+  ([vm op rest]
+     (println @(:counter vm) op rest)))
+
 (defn phi
-  [vm args]
+  "D-type"
+  [vm [x y]]
   (let [m (:mem vm)]
+    (trace vm 'Phi (format "%s ? %s : %s --> ??" @(:status vm) @(m x) @(m y)))
     (dosync
      (ref-set (m @(:counter vm))
 	      (if @(:status vm)
-		@(m (first args))
-		@(m (second args)))))))
+		@(m x)
+		@(m y))))))
     
 (defn add
-  "Add instruction"
-  [vm args]
-  (numeric-op vm args +))
+  "D-type Add instruction"
+  [vm [x y]]
+  (trace vm 'Add (format "%s %s" x y))
+  (numeric-op vm [x y] +))
 
 (defn sub
-  "Sub instruction"
-  [vm args]
-  (numeric-op vm args -))
+  "D-type Sub instruction"
+  [vm [x y]]
+  (trace vm 'Sub (format "%s %s" x y))
+  (numeric-op vm [x y] -))
 
 (defn mult
-  "Multiply instruction"
+  "D-type Multiply instruction"
   [vm args]
+  (trace vm 'Mult)
   (numeric-op vm args *))
 
 (defn div
-  "Divide"
+  "D-type Divide"
   [vm args]
+  (trace vm 'Div)
   (numeric-op vm args (fn [x y] (if (zero? y) 0 (/ x y)))))
 
 (defn noop
-  "Noop instruction"
+  "S-type Noop instruction"
   [vm args]
+  (trace vm 'Noop)
   vm)
 
 (defn copy
-  "Copy instruction"
-  [vm args]
+  "S-Type: Copy instruction"
+  [vm [x]]
+  (trace vm 'Copy (format "%s // %s" x @((:mem vm) x)))
   (dosync
-   (ref-set ((:mem vm) @(:counter vm)) @((:mem vm) (first args)))))
+   (ref-set ((:mem vm) @(:counter vm)) @((:mem vm) x))))
 
 (defn sqrt
-  "Square root instruction: undefined for negative values"
+  "S-Type: Square root instruction: undefined for negative values"
   [vm args]
+  (trace vm 'Sqrt)
   (assert (not (neg? @((:mem vm) (first args)))))
   (dosync
    (ref-set ((:mem vm) @(:counter vm)) (Math/sqrt @((:mem vm) (first args))))))
 
 (defn input
-  "Input instruction: Set the memory on the inport"
+  "S-Type: Set the memory from the inport"
   [vm args]
+  (trace vm 'Input)
   (dosync
-   (ref-set ((:mem vm) @(:counter vm)) @((:inport vm) @(:counter vm)))))
+   (ref-set ((:mem vm) @(:counter vm)) @((:inport vm) (first args)))))
 
 (defn output
   "Output instruction: Set the memory on the outport"
   [vm args]
-  (let [m (:mem vm)
-	o ((:outport vm) (first args))]
-    (dosync
-     (ref-set o @(m (second args))))))
+  (trace vm 'Output)
+  (dosync
+   (ref-set ((:outport vm) (first args))  @((:mem vm) (second args)))))
 
 (defn cmpz
+  "Comparison function"
   [vm args]
+  (trace vm 'Cmpz)
   (let [cmp (first args)
 	val @((:mem vm) (second args))
-	status
-	(cond 
-	  (= cmp 'LTZ) (< val 0)
-	  (= cmp 'LEZ) (<= val 0)
-	  (= cmp 'EQZ) (zero? val)
-	  (= cmp 'GEZ) (> val 0)
-	  (= cmp 'GTZ) (>= val 0)
-	  :else (assert false))]
+	status (cond 
+		 (= cmp 'LTZ) (< val 0)
+		 (= cmp 'LEZ) (<= val 0)
+		 (= cmp 'EQZ) (zero? val)
+		 (= cmp 'GEZ) (> val 0)
+		 (= cmp 'GTZ) (>= val 0)
+		 :else (assert false))]
     (dosync
-     (ref-set (:status vm) status))))  
+     (ref-set (:status vm) status))))
 
 (def d-type-instructions {1 add, 2 sub, 3 mult, 4 div, 5 output, 6 phi})
 (def s-type-instructions {0 noop, 1 cmpz, 2 sqrt, 3 copy, 4 input})
@@ -198,14 +214,14 @@
 	sx-relative @(x 2)
 	sy-relative @(x 3)
 	target-radius @(x 4)]
-    (println (format "%s: %s,%s,%s,%s,%s" pc score fuel-remaining sx-relative sy-relative target-radius))))
+    nil))
+    ;(println (format "%s: %s,%s,%s,%s,%s" pc score fuel-remaining sx-relative sy-relative target-radius))))
     
 (defn hohmann-input 
   [c vm]
   (println "Running with config: " c)
   (dosync
-   (ref-set ((:inport vm) 0x3E80) (double c)))
-  (println "Set to: " ((:inport vm) 0x3E80)))
+   (ref-set ((:inport vm) 0x3E80) c)))
 
 (defn run-machine
   "Run the virtual machine with the decoded instructions"
@@ -214,9 +230,9 @@
     (init-input vm)
     (doseq [instruction instructions]     
       (tracer vm)
-      (let [[op args] (first instruction)]
-	(apply op (list vm args))
-	(dosync
-	 (alter (:counter vm) inc))))
-    nil))
+       (let [[op args] (first instruction)]
+	 (apply op (list vm args))
+	 (dosync
+	  (alter (:counter vm) inc)))))
+    nil)
 	 

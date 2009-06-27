@@ -7,7 +7,7 @@
 (def bin1 "/home/jfoster/clojureprojects/icfp/uk/co/fatvat/bin1.obf")
 
 ;;; Virtual machine specification
-(defstruct virtualmachine :mem :counter :inport :outport :status)
+(defstruct virtualmachine :mem :counter :inport :outport :status :firstrun)
 
 (defn get-val
   [vm x]
@@ -219,7 +219,7 @@
   (let [memory (vector-atoms (count data))]
     (dosync
      (doall (map (fn [a d] (swap! a (fn [_] d))) memory data)))
-    (struct virtualmachine memory (atom 0) (vector-atoms 16384) (vector-atoms 16384) (atom false))))
+    (struct virtualmachine memory (atom 0) (vector-atoms 16384) (vector-atoms 16384) (atom false) (atom true))))
 
 (defn hohmann-score
   [vm]
@@ -234,8 +234,14 @@
     
 (defn hohmann-updater 
   [vm]
-  (if (zero? @(:counter vm))
-    (swap! ((:inport vm) 0x3E80) (fn [_] 1001))))
+  (if @(:firstrun vm)
+    (swap! ((:inport vm) 0x3E80) (fn [_] 1001))
+    (let [[pc score fuel-remaining sx sy target] (hohmann-score vm)
+	  d (distance [sx sy] [0 0])
+	  speed (delta-v1 target d)]
+      (swap! ((:inport vm) 0x2) (fn [x] (if (zero? x) speed 0)))
+      (swap! ((:inport vm) 0x3) (fn [x] (if (zero? x) speed 0)))
+      (println score fuel-remaining [sx sy] target d))))
 
 (defn create-vm
   [instructions]
@@ -252,6 +258,7 @@
     (apply op (list vm args)) ;; dodgy side effect
     (swap! (:counter vm) inc))
   (swap! (:counter vm) (fn [_] 0))
+  (swap! (:firstrun vm) (fn [_] false))
   vm)
 
 (defn run []

@@ -105,7 +105,19 @@
   (let [vm (init-vm)]
     (doseq [instruction instructions]
       (let [[op args] (first instruction) data (second instruction)]
-	(println op)))))
+	(cond 
+	  (= op 'Noop) (println "noop" args)
+	  (= op 'Cmpz) (println "cmpz" args)
+	  (= op 'Sqrt)  (println "sqrt" args)
+	  (= op 'Copy) (println "copy" args)
+	  (= op 'Input) (println "input" args)
+	  (= op 'Add) (println "add" args)
+	  (= op 'Sub) (println "sub" args)
+	  (= op 'Mult) (println "mult" args)
+	  (= op 'Div) (println "div" args)
+	  (= op 'Output) (println "output" args)
+	  (= op 'Phi) (println "phi" args)
+	  :else (assert false))))))
       
     
 

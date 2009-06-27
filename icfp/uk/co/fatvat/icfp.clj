@@ -100,8 +100,32 @@
   (let [memory (vector-refs (count data))]
     (dosync
      (doall
-      (map (fn [ref v] (ref-set ref v)) memory data)))
+      (map (fn [r v] (ref-set r v)) memory data)))
     (struct virtualmachine memory (ref 0) (vector-refs 16384) (vector-refs 16384) (ref false))))
+
+(defn numeric-op
+  "General numeric op"
+  [vm args f]
+  (dosync
+   (let [m (:mem vm)]
+     (println @(m (first args)) @(m (second args)))
+     (ref-set (m @(:counter vm)) (f @(m (first args)) @(m (second args)))))))  
+
+(defn add
+  "Add instruction"
+  [vm args]
+  (numeric-op vm args +))
+
+(defn sub
+  "Sub instruction"
+  [vm args]
+  (println args)
+  (numeric-op vm args -))
+
+(defn mult
+  "Multiply instruction"
+  [vm args]
+  (numeric-op vm args *))
 
 (defn noop
   "Noop instruction"
@@ -112,14 +136,14 @@
   "Copy instruction"
   [vm args]
   (dosync
-   (ref-set ((:mem vm) @(:counter vm)) (first args))))
+   (ref-set ((:mem vm) @(:counter vm)) ((:mem vm) (first args)))))
 
 (defn sqrt
   "Square root instruction: undefined for negative values"
   [vm args]
-  (assert (not (neg? (first args))))
+  (assert (not (neg? ((:mem vm) (first args)))))
   (dosync
-   (ref-set ((:mem vm) @(:counter vm)) (Math/sqrt (first args)))))
+   (ref-set ((:mem vm) @(:counter vm)) (Math/sqrt ((:mem vm (first args)))))))
 
 (defn input
   "Input instruction: Set the memory on the inport"
@@ -131,19 +155,18 @@
 (defn cmpz
   [vm args]
   (let [cmp (first args)
-	val (second args)
-	comparator
+	val @((:mem vm) (second args))
+	status
 	(cond 
-	  (= cmp 'LTZ) (partial < 0)
-	  (= cmp 'LEZ) (partial <= 0)
-	  (= cmp 'EQZ) zero?
-	  (= cmp 'GEZ) (partial > 0)
-	  (= cmp 'GTZ) (partial >= 0)
+	  (= cmp 'LTZ) (< val 0)
+	  (= cmp 'LEZ) (<= val 0)
+	  (= cmp 'EQZ) (zero? val)
+	  (= cmp 'GEZ) (> val 0)
+	  (= cmp 'GTZ) (>= val 0)
 	  :else (assert false))]
-    4))
+    (dosync
+     (ref-set (:status vm) status))))
 	  
-  
-
 ;; TODO turn the symbols into the functions.
 (defn run-machine
   "Run the virtual machine with the decoded instructions"
@@ -157,9 +180,9 @@
 	  (= op 'Sqrt) (sqrt vm args) 
 	  (= op 'Copy) (copy vm args)
 	  (= op 'Input) (input vm args)
-	  (= op 'Add) (println "add" args)
-	  (= op 'Sub) (println "sub" args)
-	  (= op 'Mult) (println "mult" args)
+	  (= op 'Add) (add vm args)
+	  (= op 'Sub) (sub vm args)
+	  (= op 'Mult) (mult vm args) 
 	  (= op 'Div) (println "div" args)
 	  (= op 'Output) (println "output" args)
 	  (= op 'Phi) (println "phi" args)

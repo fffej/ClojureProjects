@@ -1,3 +1,4 @@
+;; jeff.foster@acm.org
 (ns uk.co.fatvat.icfp
   (:import [java.lang.reflect Array])
   (:import [java.io FileInputStream File]))
@@ -256,5 +257,4 @@
 (defn run []
   (let [x (create-vm bin1)
 	ops (map first bin1)]
-    (run-machine x ops hohmann-updater)
-    (run-machine x ops hohmann-updater)))			
+    (count (take 100 (repeatedly #(run-machine x ops hohmann-updater))))))

@@ -165,6 +165,10 @@
 ;;; Physics functions
 (def G 6.6428e-11)
 
+(def mass-earth 6e24)
+
+(def radius-earth 6.357e6)
+
 (defn distance
   "Distance between two bodies"
   [[x1 y1] [x2 y2]]

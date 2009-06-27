@@ -19,12 +19,8 @@
       (doall
        (into [] (take-while (partial not= -1) (repeatedly #(.read x))))))))
 
-(defn get-op-code
-  [bytes]
-  (println "bytes" bytes)
-  (bit-shift-right (bit-and (byte (first bytes)) 0xF0) 4))
-
 (defn to-double
+  "Convert the given series of 8 bytes into an IEEE 754 number"
   [bytes]
   (Double/longBitsToDouble 
    (long
@@ -34,13 +30,30 @@
 		 (range 0 64 8))))))
 
 (defn to-int
+  "Convert the given series of bytes into an integer"
   [bytes]
   (int (reduce bit-or
 	       (map (fn [x shift] (bit-shift-left (bit-and (int x) 0xFF) shift))
 		    bytes
 		    (range 0 32 8)))))
 
+
+(defn- d-args
+  "Convert a D-type instruction into a vector of op-code + args"
+  [ins]
+  (let [x (to-int ins)]
+    [(bit-shift-right (bit-and x 0xFFFC000) 14) (bit-and x 0x00003FFF)]))
+
+(defn- s-args
+  "Convert an S-type instruction into a vector of op-code and args"
+  [op ins]
+  (if (= 'Cmpz op)
+    [(comparison (bit-shift-right (bit-and (to-int ins) 0x700000) 21)) (bit-and (to-int ins) 0x00003FFF)]
+    [(bit-and (to-int ins) 0x00003FFF)
+     (bit-shift-right (bit-and (last (butlast ins)) 0xF0) 4)]))
+
 (defn get-op
+  "Decode the 4 bytes as an op code, complete with arguments"
   [ins]
   (let [d-opcode (bit-shift-right (bit-and 0xF0 (last ins)) 4)
 	s-opcode (bit-and 0x0F (last ins))]
@@ -48,18 +61,6 @@
       (let [sins (s-type-instructions s-opcode)]
 	[sins (s-args sins ins)])
       [(d-type-instructions d-opcode) (d-args ins)])))
-
-(defn d-args
-  [ins]
-  (let [x (to-int ins)]
-    [(bit-shift-right (bit-and x 0xFFFC000) 14) (bit-and x 0x00003FFF)]))
-
-(defn s-args
-  [op ins]
-  (if (= 'Cmpz op)
-    [(comparison (bit-shift-right (bit-and (to-int ins) 0x700000) 21)) (bit-and (to-int ins) 0x00003FFF)]
-    [(bit-and (to-int ins) 0x00003FFF)
-     (bit-shift-right (bit-and (last (butlast ins)) 0xF0) 4)]))
 
 (defn get-instruction-data
   [image address]
@@ -71,14 +72,20 @@
      (to-double (subvec image (+ address 4) (+ address 12)))]))
 	  
 (defn read-data
+  "Read in the data from the image and return a series of decoded instructions"
   [image pc]
   (map (fn [x] (get-instruction-data image x)) (range 0 (count image) 12)))
 
-(defstruct virtualmachine :mem :inport :outport)
+(defstruct virtualmachine :mem :inport :outport :status)
 
 (defn vector-refs
+  "Create a vector of references, initialized to zero"
   [n]
   (into [] (take n (repeatedly #(ref 0)))))
+
+(defn init-vm
+  []
+  (struct virtualmachine (vector-refs 16384) (vector-refs 16384) (vector-refs 16384) false))
 
      
     

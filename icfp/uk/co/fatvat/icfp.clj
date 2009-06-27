@@ -108,9 +108,17 @@
   [vm args f]
   (dosync
    (let [m (:mem vm)]
-     (println @(m (first args)) @(m (second args)))
      (ref-set (m @(:counter vm)) (f @(m (first args)) @(m (second args)))))))  
 
+(defn phi
+  [vm args]
+  (let [m (:mem vm)]
+    (dosync
+     (ref-set (m @(:counter vm))
+	      (if @(:status vm)
+		@(m (first args))
+		@(m (second args)))))))
+    
 (defn add
   "Add instruction"
   [vm args]
@@ -127,6 +135,11 @@
   [vm args]
   (numeric-op vm args *))
 
+(defn div
+  "Divide"
+  [vm args]
+  (numeric-op vm args (fn [x y] (if (zero? y) 0 (/ x y)))))
+
 (defn noop
   "Noop instruction"
   [vm args]
@@ -136,14 +149,14 @@
   "Copy instruction"
   [vm args]
   (dosync
-   (ref-set ((:mem vm) @(:counter vm)) ((:mem vm) (first args)))))
+   (ref-set ((:mem vm) @(:counter vm)) @((:mem vm) (first args)))))
 
 (defn sqrt
   "Square root instruction: undefined for negative values"
   [vm args]
-  (assert (not (neg? ((:mem vm) (first args)))))
+  (assert (not (neg? @((:mem vm) (first args)))))
   (dosync
-   (ref-set ((:mem vm) @(:counter vm)) (Math/sqrt ((:mem vm (first args)))))))
+   (ref-set ((:mem vm) @(:counter vm)) (Math/sqrt @((:mem vm) (first args))))))
 
 (defn input
   "Input instruction: Set the memory on the inport"
@@ -151,7 +164,14 @@
   (dosync
    (ref-set ((:mem vm) @(:counter vm)) @((:inport vm) @(:counter vm)))))
 
-; {0 'LTZ, 1 'LEZ, 2 'EQZ, 3 'GEZ, 4 'GTZ})
+(defn output
+  "Output instruction: Set the memory on the outport"
+  [vm args]
+  (let [m (:mem vm)
+	o ((:outport vm) (first args))]
+    (dosync
+     (ref-set o @(m (second args))))))
+
 (defn cmpz
   [vm args]
   (let [cmp (first args)
@@ -166,6 +186,7 @@
 	  :else (assert false))]
     (dosync
      (ref-set (:status vm) status))))
+
 	  
 ;; TODO turn the symbols into the functions.
 (defn run-machine
@@ -183,9 +204,9 @@
 	  (= op 'Add) (add vm args)
 	  (= op 'Sub) (sub vm args)
 	  (= op 'Mult) (mult vm args) 
-	  (= op 'Div) (println "div" args)
-	  (= op 'Output) (println "output" args)
-	  (= op 'Phi) (println "phi" args)
+	  (= op 'Div) (div vm args)
+	  (= op 'Output) (output vm args)
+	  (= op 'Phi) (phi vm args)
 	  :else (assert false)))
       (dosync
        (alter (:counter vm) inc)))

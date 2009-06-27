@@ -8,33 +8,35 @@
 ;;; Virtual machine specification
 (defstruct virtualmachine :mem :counter :inport :outport :status)
 
+(defn get-val
+  [vm x]
+  @((:mem vm) x))
+
 (defn numeric-op
   "D-type General numeric op"
-  [vm args f]
-  (dosync
-   (let [m (:mem vm)]
-     (ref-set (m @(:counter vm)) (f @(m (first args)) @(m (second args)))))))  
+  [vm [x y] f]
+  (let [m (:mem vm)]
+    (ref-set (m @(:counter vm)) (f @(m x) @(m y))))
+
+(def *trace-enabled* (ref false))
 
 (defn trace
   ([vm op]
-     (println @(:counter vm) op))
+     (when @*trace-enabled*
+       (println @(:counter vm) op)))
   ([vm op rest]
-     (println @(:counter vm) op rest)))
+     (when @*trace-enabled*
+       (println @(:counter vm) op rest))))
 
 (defn phi
   "D-type"
   [vm [x y]]
   (let [m (:mem vm)]
-    (trace vm 'Phi (format "%s ? %s : %s --> ??" @(:status vm) @(m x) @(m y)))
-    (dosync
-     (ref-set (m @(:counter vm))
-	      (if @(:status vm)
-		@(m x)
-		@(m y))))))
-
-(defn get-val
-  [vm x]
-  @((:mem vm) x))
+    (trace vm 'Phi (format "%s ? %s : %s --> %s" @(:status vm) @(m x) @(m y) (if @(:status vm) @(m x) @(m y))))
+    (ref-set (m @(:counter vm))
+	     (if @(:status vm)
+	       @(m x)
+	       @(m y))))))
 
 (defn print-args
   [vm op x y]
@@ -73,47 +75,41 @@
 (defn copy
   "S-Type: Copy instruction"
   [vm [x]]
-  (trace vm 'Copy (format "%s // %s" x @((:mem vm) x)))
-  (dosync
-   (ref-set ((:mem vm) @(:counter vm)) @((:mem vm) x))))
+  (trace vm 'Copy (format "%s // %s" x (get-val vm x)))
+  (ref-set ((:mem vm) @(:counter vm)) (get-val vm x)))
 
 (defn sqrt
   "S-Type: Square root instruction: undefined for negative values"
-  [vm args]
+  [vm [x]]
   (trace vm 'Sqrt)
-  (assert (not (neg? @((:mem vm) (first args)))))
-  (dosync
-   (ref-set ((:mem vm) @(:counter vm)) (Math/sqrt @((:mem vm) (first args))))))
+  (assert (not (neg? (get-val vm x))))
+  (ref-set ((:mem vm) @(:counter vm)) (Math/sqrt (get-val vm x))))
 
 (defn input
   "S-Type: Set the memory from the inport"
   [vm args]
   (trace vm 'Input)
-  (dosync
-   (ref-set ((:mem vm) @(:counter vm)) @((:inport vm) (first args)))))
+  (ref-set ((:mem vm) @(:counter vm)) @((:inport vm) (first args))))
 
 (defn output
   "Output instruction: Set the memory on the outport"
-  [vm args]
-  (trace vm 'Output)
-  (dosync
-   (ref-set ((:outport vm) (first args))  @((:mem vm) (second args)))))
+  [vm [x y]]
+  (trace vm 'Output (format "%s %s // %s" x y (get-val vm y)))
+  (ref-set ((:outport vm) x)  (get-val vm y)))
 
 (defn cmpz
   "Comparison function"
-  [vm args]
-  (trace vm 'Cmpz)
-  (let [cmp (first args)
-	val @((:mem vm) (second args))
-	status (cond 
+  [vm [cmp y]]
+  (let [val @((:mem vm) y)
+	status (cond ;; TODO replace this with functions so it becomes (apply cmp val)
 		 (= cmp 'LTZ) (< val 0)
 		 (= cmp 'LEZ) (<= val 0)
 		 (= cmp 'EQZ) (zero? val)
 		 (= cmp 'GEZ) (> val 0)
 		 (= cmp 'GTZ) (>= val 0)
 		 :else (assert false))]
-    (dosync
-     (ref-set (:status vm) status))))
+    (trace vm 'Cmpz (format "%s %s --> %s" cmp y status))
+    (ref-set (:status vm) status)))
 
 (def d-type-instructions {1 add, 2 sub, 3 mult, 4 div, 5 output, 6 phi})
 (def s-type-instructions {0 noop, 1 cmpz, 2 sqrt, 3 copy, 4 input})
@@ -199,6 +195,17 @@
   (let [dx (- x1 x2) dy (- y1 y2)]
     (Math/sqrt (+ (* dx dx) (* dy dy)))))
 
+(def GM (* G mass-earth))
+
+;; From http://en.wikipedia.org/wiki/Hohmann_transfer_orbit
+(defn delta-v1
+  [r1 r2]
+  (* (Math/sqrt (/ GM r1)) (- (Math/sqrt (/ (* 2 r2) (+ r1 r2))) 1)))
+
+(defn delta-v2
+  [r1 r2]
+  (* (Math/sqrt (/ GM r2)) (- 1 (Math/sqrt (/ (* 2 r1) (+ r1 r2))))))
+
 ;;; Virtual machine executing instructions
 (defn vector-refs
   "Create a vector of references, initialized to zero"
@@ -209,8 +216,7 @@
   [data]
   (let [memory (vector-refs (count data))]
     (dosync
-     (doall
-      (map (fn [r v] (ref-set r v)) memory data)))
+     (doall (map ref-set memory data)))
     (struct virtualmachine memory (ref 0) (vector-refs 16384) (vector-refs 16384) (ref false))))
 
 (defn hohmann-trace
@@ -222,25 +228,22 @@
 	sx-relative @(x 2)
 	sy-relative @(x 3)
 	target-radius @(x 4)]
-    nil))
-    ;(println (format "%s: %s,%s,%s,%s,%s" pc score fuel-remaining sx-relative sy-relative target-radius))))
+    [pc score fuel-remaining sx-relative sy-relative target-radius]))
     
 (defn hohmann-input 
   [c vm]
   (println "Running with config: " c)
-  (dosync
-   (ref-set ((:inport vm) 0x3E80) c)))
+  (dosync (ref-set ((:inport vm) 0x3E80) c)))
 
 (defn run-machine
   "Run the virtual machine with the decoded instructions"
   [instructions tracer init-input]
   (let [vm (init-vm (map second instructions))]
     (init-input vm)
-    (doseq [instruction instructions]     
-      (tracer vm)
+    (dosync
+     (doseq [instruction instructions]     
        (let [[op args] (first instruction)]
-	 (apply op (list vm args))
-	 (dosync
-	  (alter (:counter vm) inc)))))
-    nil)
-	 
+	 (apply op (list vm args)) ;; dodgy side effect
+	 (alter (:counter vm) inc))))
+    (tracer vm)))
+

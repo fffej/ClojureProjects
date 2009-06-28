@@ -7,7 +7,7 @@
 (def bin1 "/home/jfoster/clojureprojects/icfp/uk/co/fatvat/bin1.obf")
 
 ;;; Virtual machine specification
-(defstruct virtualmachine :mem :counter :inport :outport :status :firstrun)
+(defstruct virtualmachine :mem :counter :inport :outport :status :firstrun :user)
 
 (defn get-val
   [vm x]
@@ -217,9 +217,10 @@
   (let [memory (vector-atoms (count data))]
     (dosync
      (doall (map (fn [a d] (swap! a (fn [_] d))) memory data)))
-    (struct virtualmachine memory (atom 0) (vector-atoms 16384) (vector-atoms 16384) (atom false) (atom true))))
+    (struct virtualmachine memory (atom 0) (vector-atoms 16384) (vector-atoms 16384) (atom false) (atom true) (atom []))))
 
 (defn hohmann-score
+  "Return information about the outport sensors for the Hohmann example"
   [vm]
   (let [x (:outport vm)
 	pc @(:counter vm)
@@ -231,15 +232,9 @@
     [pc score fuel-remaining sx-relative sy-relative target-radius]))
     
 (defn hohmann-updater 
+  "Given the state of the virtual machine, determine what to boost"
   [vm]
-  (if @(:firstrun vm)
-    (swap! ((:inport vm) 0x3E80) (fn [_] 1001))
-    (let [[pc score fuel-remaining sx sy target] (hohmann-score vm)
-	  d (distance [sx sy] [0 0])
-	  speed (delta-v1 target d)]
-      (swap! ((:inport vm) 0x2) (fn [x] (if (zero? x) speed 0)))
-      (swap! ((:inport vm) 0x3) (fn [x] (if (zero? x) speed 0)))
-      (println score fuel-remaining [sx sy] target d))))
+  (swap! ((:inport vm) 0x3E80) (fn [_] 1001)))
 
 (defn create-vm
   [instructions]
@@ -264,4 +259,4 @@
 (defn run []
   (let [x (create-vm bin1)
 	ops (map first bin1)]
-    (count (take 100 (repeatedly #(run-machine x ops hohmann-updater))))))
+    (time (count (take 10000 (repeatedly #(run-machine x ops hohmann-updater)))))))

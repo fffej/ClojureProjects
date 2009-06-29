@@ -1,5 +1,6 @@
 ;; jeff.foster@acm.org
 (ns uk.co.fatvat.icfp
+  (:use clojure.contrib.trace)
   (:import [java.lang.reflect Array])
   (:import [java.io FileInputStream File]))
 
@@ -19,21 +20,11 @@
   (let [m (:mem vm)]
     (swap! (m @(:counter vm)) (fn [_] (f @(m x) @(m y))))))
 
-(def *trace-enabled* (atom false))
-
-(defn trace
-  ([vm op]
-     (when @*trace-enabled*
-       (println @(:counter vm) op)))
-  ([vm op rest]
-     (when @*trace-enabled*
-       (println @(:counter vm) op rest))))
-
 (defn phi
   "D-type"
   [vm [x y]]
   (let [m (:mem vm)]
-    (trace vm 'Phi (format "%s ? %s : %s --> %s" @(:status vm) @(m x) @(m y) (if @(:status vm) @(m x) @(m y))))
+    (trace 'Phi (format "%s ? %s : %s --> %s" @(:status vm) @(m x) @(m y) (if @(:status vm) @(m x) @(m y))))
     (swap! (m @(:counter vm))
 	   (fn [_]
 	     (if @(:status vm)
@@ -47,56 +38,56 @@
 (defn add
   "D-type Add instruction"
   [vm [x y]]
-  (trace vm 'Add (print-args vm '+ x y))
+  (trace 'Add (print-args vm '+ x y))
   (numeric-op vm [x y] +))
 
 (defn sub
   "D-type Sub instruction"
   [vm [x y]]
-  (trace vm 'Sub (print-args vm '- x y))
+  (trace 'Sub (print-args vm '- x y))
   (numeric-op vm [x y] -))
 
 (defn mult
   "D-type Multiply instruction"
   [vm [x y]]
-  (trace vm 'Mult (print-args vm '* x y))
+  (trace 'Mult (print-args vm '* x y))
   (numeric-op vm [x y] *))
 
 (defn div
   "D-type Divide"
   [vm args]
-  (trace vm 'Div)
+  (trace 'Div)
   (numeric-op vm args (fn [x y] (if (zero? y) 0 (/ x y)))))
 
 (defn noop
   "S-type Noop instruction"
   [vm args]
-  (trace vm 'Noop)
+  (trace 'Noop)
   vm)
 
 (defn copy
   "S-Type: Copy instruction"
   [vm [x]]
-  (trace vm 'Copy (format "%s // %s" x (get-val vm x)))
+  (trace 'Copy (format "%s // %s" x (get-val vm x)))
   (swap! ((:mem vm) @(:counter vm)) (fn [_] (get-val vm x))))
 
 (defn sqrt
   "S-Type: Square root instruction: undefined for negative values"
   [vm [x]]
-  (trace vm 'Sqrt)
+  (trace 'Sqrt)
   (assert (not (neg? (get-val vm x))))
   (swap! ((:mem vm) @(:counter vm)) (fn [_] (Math/sqrt (get-val vm x)))))
 
 (defn input
   "S-Type: Set the memory from the inport"
   [vm [x]]
-  (trace vm 'Input)
+  (trace 'Input)
   (swap! ((:mem vm) @(:counter vm)) (fn [_] @((:inport vm) x))))
 
 (defn output
   "Output instruction: Set the memory on the outport"
   [vm [x y]]
-  (trace vm 'Output (format "%s %s // %s" x y (get-val vm y)))
+  (trace 'Output (format "%s %s // %s" x y (get-val vm y)))
   (swap! ((:outport vm) x) (fn [_] (get-val vm y))))
 
 (defn cmpz
@@ -110,7 +101,7 @@
 		 (= cmp 'GEZ) (> val 0)
 		 (= cmp 'GTZ) (>= val 0)
 		 :else (assert false))]
-    (trace vm 'Cmpz (format "%s %s --> %s" cmp y status))
+    (trace 'Cmpz (format "%s %s --> %s" cmp y status))
     (swap! (:status vm) (fn [_] status))))
 
 (def d-type-instructions {1 add, 2 sub, 3 mult, 4 div, 5 output, 6 phi})
@@ -222,6 +213,7 @@
 (defn hohmann-score
   "Return information about the outport sensors for the Hohmann example"
   [vm]
+  (println (:counter vm))
   (let [x (:outport vm)
 	pc @(:counter vm)
 	score @(x 0)
@@ -234,26 +226,26 @@
 (defn hohmann-updater 
   "Given the state of the virtual machine, determine what to boost"
   [vm]
-  (swap! ((:inport vm) 0x3E80) (fn [_] 1001))
-  (let [[pc score fuel-remaining sx sy target] (hohmann-score vm)]
-    (swap! (:user vm) (fn [x] (cons [sx sy] x)))
-    (if (= 3 (count @(:user vm)))
-      (let [v @(:user vm)
-	    [x1 y1] (first v)
-	    [x2 y2] (second v)
-	    dx (- x2 x1)
-	    dy (- y2 y1)
-	    burn1 (delta-v1 (distance [sx sy] [0 0]) target)
-	    norm (distance [dx dy] [0 0])]
-	(println "BURN: " dx dy norm)
-	(swap! ((:inport vm) 0x2) (fn [_] (* (/ dx norm) burn1)))
-	(swap! ((:inport vm) 0x3) (fn [_] (* (/ dy norm) burn1))))
-      (let [zerofn (fn [_] 0)]
-	(swap! ((:inport vm) 0x2) zerofn)
-	(swap! ((:inport vm) 0x3) zerofn)))
-    (when (and (> (count @(:user vm)) 3) 
-	       (< (Math/abs (- (distance [sx sy] [0 0]) target)) 1000000))
-      (println "Time to fire the second burn." pc (Math/abs (- (distance [sx sy] [0 0]) target))))))
+  (swap! ((:inport vm) 0x3E80) (fn [_] 1001)))
+; (let [[pc score fuel-remaining sx sy target] (hohmann-score vm)]
+;   (swap! (:user vm) (fn [x] (cons [sx sy] x)))
+;   (if (= 3 (count @(:user vm)))
+;     (let [v @(:user vm)
+;	    [x1 y1] (first v)
+;	    [x2 y2] (second v)
+;	    dx (- x2 x1)
+;	    dy (- y2 y1)
+;	    burn1 (delta-v1 (distance [sx sy] [0 0]) target)
+;	    norm (distance [dx dy] [0 0])]
+;	(println "BURN: " dx dy norm)
+;	(swap! ((:inport vm) 0x2) (fn [_] (* (/ dx norm) burn1)))
+;	(swap! ((:inport vm) 0x3) (fn [_] (* (/ dy norm) burn1))))
+;     (let [zerofn (fn [_] 0)]
+;	(swap! ((:inport vm) 0x2) zerofn)
+;	(swap! ((:inport vm) 0x3) zerofn)))
+;   (when (and (> (count @(:user vm)) 3) 
+;	       (< (Math/abs (- (distance [sx sy] [0 0]) target)) 1000000))
+;     (println "Time to fire the second burn." pc (Math/abs (- (distance [sx sy] [0 0]) target))))))
     
 
 (defn create-vm
@@ -279,4 +271,4 @@
 (defn run []
   (let [x (create-vm bin1)
 	ops (map first bin1)]
-    (time (count (take 100000 (repeatedly #(run-machine x ops hohmann-updater)))))))
+    (time (hohmann-score (first (take 1 (repeatedly #(run-machine x ops hohmann-updater))))))))

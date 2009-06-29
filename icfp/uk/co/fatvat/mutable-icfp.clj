@@ -1,5 +1,6 @@
 ;; jeff.foster@acm.org
 (ns uk.co.fatvat.icfp
+  (:use clojure.contrib.trace); :only (trace)])
   (:import [java.lang.reflect Array])
   (:import [java.io FileInputStream File]))
 
@@ -19,21 +20,11 @@
   (let [m (:mem vm)]
     (swap! (m @(:counter vm)) (constantly (f @(m x) @(m y))))))
 
-(def *trace-enabled* (atom false))
-
-(defn trace
-  ([vm op]
-     (when @*trace-enabled*
-       (println @(:counter vm) op)))
-  ([vm op rest]
-     (when @*trace-enabled*
-       (println @(:counter vm) op rest))))
-
 (defn phi
   "D-type"
   [vm [x y]]
   (let [m (:mem vm)]
-    (trace vm 'Phi (format "%s ? %s : %s --> %s" @(:status vm) @(m x) @(m y) (if @(:status vm) @(m x) @(m y))))
+    (trace 'Phi (format "%s ? %s : %s --> %s" @(:status vm) @(m x) @(m y) (if @(:status vm) @(m x) @(m y))))
     (swap! (m @(:counter vm))
 	   (constantly
 	     (if @(:status vm)
@@ -47,56 +38,56 @@
 (defn add
   "D-type Add instruction"
   [vm [x y]]
-  (trace vm 'Add (print-args vm '+ x y))
+  (trace 'Add (print-args vm '+ x y))
   (numeric-op vm [x y] +))
 
 (defn sub
   "D-type Sub instruction"
   [vm [x y]]
-  (trace vm 'Sub (print-args vm '- x y))
+  (trace 'Sub (print-args vm '- x y))
   (numeric-op vm [x y] -))
 
 (defn mult
   "D-type Multiply instruction"
   [vm [x y]]
-  (trace vm 'Mult (print-args vm '* x y))
+  (trace  'Mult (print-args vm '* x y))
   (numeric-op vm [x y] *))
 
 (defn div
   "D-type Divide"
   [vm args]
-  (trace vm 'Div)
+  (trace 'Div)
   (numeric-op vm args (fn [x y] (if (zero? y) 0 (/ x y)))))
 
 (defn noop
   "S-type Noop instruction"
   [vm args]
-  (trace vm 'Noop)
+  (trace 'Noop)
   vm)
 
 (defn copy
   "S-Type: Copy instruction"
   [vm [x]]
-  (trace vm 'Copy (format "%s // %s" x (get-val vm x)))
+  (trace 'Copy (format "%s // %s" x (get-val vm x)))
   (swap! ((:mem vm) @(:counter vm)) (constantly (get-val vm x))))
 
 (defn sqrt
   "S-Type: Square root instruction: undefined for negative values"
   [vm [x]]
-  (trace vm 'Sqrt)
+  (trace 'Sqrt)
   (assert (not (neg? (get-val vm x))))
   (swap! ((:mem vm) @(:counter vm)) (constantly (Math/sqrt (get-val vm x)))))
 
 (defn input
   "S-Type: Set the memory from the inport"
   [vm [x]]
-  (trace vm 'Input)
+  (trace 'Input)
   (swap! ((:mem vm) @(:counter vm)) (constantly @((:inport vm) x))))
 
 (defn output
   "Output instruction: Set the memory on the outport"
   [vm [x y]]
-  (trace vm 'Output (format "%s %s // %s" x y (get-val vm y)))
+  (trace 'Output (format "%s %s // %s" x y (get-val vm y)))
   (swap! ((:outport vm) x) (constantly (get-val vm y))))
 
 (defn cmpz
@@ -110,7 +101,7 @@
 		 (= cmp 'GEZ) (> val 0)
 		 (= cmp 'GTZ) (>= val 0)
 		 :else (assert false))]
-    (trace vm 'Cmpz (format "%s %s --> %s" cmp y status))
+    (trace 'Cmpz (format "%s %s --> %s" cmp y status))
     (swap! (:status vm) (constantly status))))
 
 (def d-type-instructions {1 add, 2 sub, 3 mult, 4 div, 5 output, 6 phi})
@@ -234,4 +225,4 @@
 (defn run []
   (let [x (create-vm bin1)
 	ops (map first bin1)]
-    (count (take 100 (repeatedly #(run-machine x ops hohmann-updater))))))
+    (time (count (take 1000 (repeatedly #(run-machine x ops hohmann-updater)))))))

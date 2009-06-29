@@ -227,26 +227,6 @@
   "Given the state of the virtual machine, determine what to boost"
   [vm]
   (swap! ((:inport vm) 0x3E80) (fn [_] 1001)))
-; (let [[pc score fuel-remaining sx sy target] (hohmann-score vm)]
-;   (swap! (:user vm) (fn [x] (cons [sx sy] x)))
-;   (if (= 3 (count @(:user vm)))
-;     (let [v @(:user vm)
-;	    [x1 y1] (first v)
-;	    [x2 y2] (second v)
-;	    dx (- x2 x1)
-;	    dy (- y2 y1)
-;	    burn1 (delta-v1 (distance [sx sy] [0 0]) target)
-;	    norm (distance [dx dy] [0 0])]
-;	(println "BURN: " dx dy norm)
-;	(swap! ((:inport vm) 0x2) (fn [_] (* (/ dx norm) burn1)))
-;	(swap! ((:inport vm) 0x3) (fn [_] (* (/ dy norm) burn1))))
-;     (let [zerofn (fn [_] 0)]
-;	(swap! ((:inport vm) 0x2) zerofn)
-;	(swap! ((:inport vm) 0x3) zerofn)))
-;   (when (and (> (count @(:user vm)) 3) 
-;	       (< (Math/abs (- (distance [sx sy] [0 0]) target)) 1000000))
-;     (println "Time to fire the second burn." pc (Math/abs (- (distance [sx sy] [0 0]) target))))))
-    
 
 (defn create-vm
   [instructions]

@@ -7,7 +7,7 @@
 (def bin1 "/home/jfoster/clojureprojects/icfp/uk/co/fatvat/bin1.obf")
 
 ;;; Virtual machine specification
-(defstruct virtualmachine :mem :counter :inport :outport :status :firstrun :user)
+(defstruct virtualmachine :mem :counter :inport :outport :status :firstrun)
 
 (defn get-val
   [vm x]
@@ -17,7 +17,7 @@
   "D-type General numeric op"
   [vm [x y] f]
   (let [m (:mem vm)]
-    (swap! (m @(:counter vm)) (fn [_] (f @(m x) @(m y))))))
+    (swap! (m @(:counter vm)) (constantly (f @(m x) @(m y))))))
 
 (def *trace-enabled* (atom false))
 
@@ -35,7 +35,7 @@
   (let [m (:mem vm)]
     (trace vm 'Phi (format "%s ? %s : %s --> %s" @(:status vm) @(m x) @(m y) (if @(:status vm) @(m x) @(m y))))
     (swap! (m @(:counter vm))
-	   (fn [_]
+	   (constantly
 	     (if @(:status vm)
 	       @(m x)
 	       @(m y))))))
@@ -78,26 +78,26 @@
   "S-Type: Copy instruction"
   [vm [x]]
   (trace vm 'Copy (format "%s // %s" x (get-val vm x)))
-  (swap! ((:mem vm) @(:counter vm)) (fn [_] (get-val vm x))))
+  (swap! ((:mem vm) @(:counter vm)) (constantly (get-val vm x))))
 
 (defn sqrt
   "S-Type: Square root instruction: undefined for negative values"
   [vm [x]]
   (trace vm 'Sqrt)
   (assert (not (neg? (get-val vm x))))
-  (swap! ((:mem vm) @(:counter vm)) (fn [_] (Math/sqrt (get-val vm x)))))
+  (swap! ((:mem vm) @(:counter vm)) (constantly (Math/sqrt (get-val vm x)))))
 
 (defn input
   "S-Type: Set the memory from the inport"
   [vm [x]]
   (trace vm 'Input)
-  (swap! ((:mem vm) @(:counter vm)) (fn [_] @((:inport vm) x))))
+  (swap! ((:mem vm) @(:counter vm)) (constantly @((:inport vm) x))))
 
 (defn output
   "Output instruction: Set the memory on the outport"
   [vm [x y]]
   (trace vm 'Output (format "%s %s // %s" x y (get-val vm y)))
-  (swap! ((:outport vm) x) (fn [_] (get-val vm y))))
+  (swap! ((:outport vm) x) (constantly (get-val vm y))))
 
 (defn cmpz
   "Comparison function"
@@ -111,7 +111,7 @@
 		 (= cmp 'GTZ) (>= val 0)
 		 :else (assert false))]
     (trace vm 'Cmpz (format "%s %s --> %s" cmp y status))
-    (swap! (:status vm) (fn [_] status))))
+    (swap! (:status vm) (constantly status))))
 
 (def d-type-instructions {1 add, 2 sub, 3 mult, 4 div, 5 output, 6 phi})
 (def s-type-instructions {0 noop, 1 cmpz, 2 sqrt, 3 copy, 4 input})
@@ -182,30 +182,6 @@
   [image]
   (map (fn [x] (get-instruction-data image x)) (range 0 (count image) 12)))
 
-;;; Physics functions
-(def G 6.6428e-11)
-
-(def mass-earth 6e24)
-
-(def radius-earth 6.357e6)
-
-(defn distance
-  "Distance between two bodies"
-  [[x1 y1] [x2 y2]]
-  (let [dx (- x1 x2) dy (- y1 y2)]
-    (Math/sqrt (+ (* dx dx) (* dy dy)))))
-
-(def GM (* G mass-earth))
-
-;; From http://en.wikipedia.org/wiki/Hohmann_transfer_orbit
-(defn delta-v1
-  [r1 r2]
-  (* (Math/sqrt (/ GM r1)) (- (Math/sqrt (/ (* 2 r2) (+ r1 r2))) 1)))
-
-(defn delta-v2
-  [r1 r2]
-  (* (Math/sqrt (/ GM r2)) (- 1 (Math/sqrt (/ (* 2 r1) (+ r1 r2))))))
-
 ;;; Virtual machine executing instructions
 (defn vector-atoms
   "Create a vector of atoms, initialized to zero"
@@ -216,11 +192,10 @@
   [data]
   (let [memory (vector-atoms (count data))]
     (dosync
-     (doall (map (fn [a d] (swap! a (fn [_] d))) memory data)))
-    (struct virtualmachine memory (atom 0) (vector-atoms 16384) (vector-atoms 16384) (atom false) (atom true) (atom []))))
+     (doall (map (fn [a d] (swap! a (constantly d))) memory data)))
+    (struct virtualmachine memory (atom 0) (vector-atoms 16384) (vector-atoms 16384) (atom false) (atom true))))
 
 (defn hohmann-score
-  "Return information about the outport sensors for the Hohmann example"
   [vm]
   (let [x (:outport vm)
 	pc @(:counter vm)
@@ -232,29 +207,9 @@
     [pc score fuel-remaining sx-relative sy-relative target-radius]))
     
 (defn hohmann-updater 
-  "Given the state of the virtual machine, determine what to boost"
   [vm]
-  (swap! ((:inport vm) 0x3E80) (fn [_] 1001))
-  (let [[pc score fuel-remaining sx sy target] (hohmann-score vm)]
-    (swap! (:user vm) (fn [x] (cons [sx sy] x)))
-    (if (= 3 (count @(:user vm)))
-      (let [v @(:user vm)
-	    [x1 y1] (first v)
-	    [x2 y2] (second v)
-	    dx (- x2 x1)
-	    dy (- y2 y1)
-	    burn1 (delta-v1 (distance [sx sy] [0 0]) target)
-	    norm (distance [dx dy] [0 0])]
-	(println "BURN: " dx dy norm)
-	(swap! ((:inport vm) 0x2) (fn [_] (* (/ dx norm) burn1)))
-	(swap! ((:inport vm) 0x3) (fn [_] (* (/ dy norm) burn1))))
-      (let [zerofn (fn [_] 0)]
-	(swap! ((:inport vm) 0x2) zerofn)
-	(swap! ((:inport vm) 0x3) zerofn)))
-    (when (and (> (count @(:user vm)) 3) 
-	       (< (Math/abs (- (distance [sx sy] [0 0]) target)) 1000000))
-      (println "Time to fire the second burn." pc (Math/abs (- (distance [sx sy] [0 0]) target))))))
-    
+  (when @(:firstrun vm)
+    (swap! ((:inport vm) 0x3E80) (constantly 1001))))
 
 (defn create-vm
   [instructions]
@@ -272,11 +227,11 @@
   (doseq [[op args] ops]     
     (apply op (list vm args)) ;; dodgy side effect
     (swap! (:counter vm) inc))
-  (swap! (:counter vm) (fn [_] 0))
-  (swap! (:firstrun vm) (fn [_] false))
+  (swap! (:counter vm) (constantly 0))
+  (swap! (:firstrun vm) (constantly false))
   vm)
 
 (defn run []
   (let [x (create-vm bin1)
 	ops (map first bin1)]
-    (time (count (take 100000 (repeatedly #(run-machine x ops hohmann-updater)))))))
+    (count (take 100 (repeatedly #(run-machine x ops hohmann-updater))))))

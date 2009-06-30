@@ -10,30 +10,40 @@
 ;;; Virtual machine specification
 (defstruct virtualmachine :mem :counter :inport :outport :status :firstrun :user)
 
-(defn get-val
-  [vm x]
-  @((:mem vm) x))
+(defn increment-counter
+  [vm]
+  (assoc vm :counter (inc (:counter vm))))
+
+(defn memory-put
+  "Update the memory specified by the key with the address to the given value"
+  [vm key addr val]
+  (assoc vm key (assoc (key vm) addr val)))
+
+(defn memory-read
+  "Return the value in key at address"
+  [vm key addr]
+  ((key vm) addr))
+
+(defn mem-read
+  [vm addr]
+  ((:mem vm) addr))
 
 (defn numeric-op
   "D-type General numeric op"
   [vm [x y] f]
-  (let [m (:mem vm)]
-    (swap! (m @(:counter vm)) (fn [_] (f @(m x) @(m y))))))
+  (memory-put vm :mem (:counter vm) (f (mem-read vm x) (mem-read vm y))))
 
 (defn phi
   "D-type"
   [vm [x y]]
   (let [m (:mem vm)]
-    (trace 'Phi (format "%s ? %s : %s --> %s" @(:status vm) @(m x) @(m y) (if @(:status vm) @(m x) @(m y))))
-    (swap! (m @(:counter vm))
-	   (fn [_]
-	     (if @(:status vm)
-	       @(m x)
-	       @(m y))))))
+    (trace 'Phi (format "%s ? %s : %s --> %s" (:status vm) (m x) (m y) (if (:status vm) (m x) (m y))))
+    (memory-put vm :mem (:counter vm)
+	     (if (:status vm) (m x) (m y)))))
 
 (defn print-args
   [vm op x y]
-  (format "%s %s // %s %s %s" x y (get-val vm x) op (get-val vm y)))
+  (format "%s %s // %s %s %s" x y (mem-read vm x) op (mem-read vm y)))
     
 (defn add
   "D-type Add instruction"
@@ -68,32 +78,32 @@
 (defn copy
   "S-Type: Copy instruction"
   [vm [x]]
-  (trace 'Copy (format "%s // %s" x (get-val vm x)))
-  (swap! ((:mem vm) @(:counter vm)) (fn [_] (get-val vm x))))
+  (trace 'Copy (format "%s // %s" x (mem-read vm x)))
+  (memory-put vm :mem (:counter vm) (mem-read vm x)))
 
 (defn sqrt
   "S-Type: Square root instruction: undefined for negative values"
   [vm [x]]
   (trace 'Sqrt)
-  (assert (not (neg? (get-val vm x))))
-  (swap! ((:mem vm) @(:counter vm)) (fn [_] (Math/sqrt (get-val vm x)))))
+  (assert (not (neg? (mem-read vm x))))
+  (memory-put vm :mem (:counter vm) (Math/sqrt (mem-read vm x))))
 
 (defn input
   "S-Type: Set the memory from the inport"
   [vm [x]]
   (trace 'Input)
-  (swap! ((:mem vm) @(:counter vm)) (fn [_] @((:inport vm) x))))
+  (memory-put vm :mem (:counter vm) (memory-read vm :inport x)))
 
 (defn output
   "Output instruction: Set the memory on the outport"
   [vm [x y]]
-  (trace 'Output (format "%s %s // %s" x y (get-val vm y)))
-  (swap! ((:outport vm) x) (fn [_] (get-val vm y))))
+  (trace 'Output (format "%s %s // %s" x y (mem-read vm y)))
+  (memory-put vm :outport x (mem-read vm y)))
 
 (defn cmpz
   "Comparison function"
   [vm [cmp y]]
-  (let [val @((:mem vm) y)
+  (let [val (mem-read vm y)
 	status (cond ;; TODO replace this with functions so it becomes (apply cmp val)
 		 (= cmp 'LTZ) (< val 0)
 		 (= cmp 'LEZ) (<= val 0)
@@ -102,7 +112,14 @@
 		 (= cmp 'GTZ) (>= val 0)
 		 :else (assert false))]
     (trace 'Cmpz (format "%s %s --> %s" cmp y status))
-    (swap! (:status vm) (fn [_] status))))
+    (struct virtualmachine 
+	    (:mem vm)
+	    (:counter vm)
+	    (:inport vm)
+	    (:outport vm)
+	    status
+	    (:firstrun vm)
+	    (:user vm))))
 
 (def d-type-instructions {1 add, 2 sub, 3 mult, 4 div, 5 output, 6 phi})
 (def s-type-instructions {0 noop, 1 cmpz, 2 sqrt, 3 copy, 4 input})
@@ -173,60 +190,30 @@
   [image]
   (map (fn [x] (get-instruction-data image x)) (range 0 (count image) 12)))
 
-;;; Physics functions
-(def G 6.6428e-11)
-
-(def mass-earth 6e24)
-
-(def radius-earth 6.357e6)
-
-(defn distance
-  "Distance between two bodies"
-  [[x1 y1] [x2 y2]]
-  (let [dx (- x1 x2) dy (- y1 y2)]
-    (Math/sqrt (+ (* dx dx) (* dy dy)))))
-
-(def GM (* G mass-earth))
-
-;; From http://en.wikipedia.org/wiki/Hohmann_transfer_orbit
-(defn delta-v1
-  [r1 r2]
-  (* (Math/sqrt (/ GM r1)) (- (Math/sqrt (/ (* 2 r2) (+ r1 r2))) 1)))
-
-(defn delta-v2
-  [r1 r2]
-  (* (Math/sqrt (/ GM r2)) (- 1 (Math/sqrt (/ (* 2 r1) (+ r1 r2))))))
-
 ;;; Virtual machine executing instructions
-(defn vector-atoms
-  "Create a vector of atoms, initialized to zero"
-  [n]
-  (into [] (take n (repeatedly #(atom 0)))))
-
 (defn init-vm
+  "Create a new VM with the initial data segment"
   [data]
-  (let [memory (vector-atoms (count data))]
-    (dosync
-     (doall (map (fn [a d] (swap! a (fn [_] d))) memory data)))
-    (struct virtualmachine memory (atom 0) (vector-atoms 16384) (vector-atoms 16384) (atom false) (atom true) (atom []))))
+  (struct virtualmachine (vec data) 0 (vec (repeat 16384 0)) (vec (repeat 16384 0)) false true []))
 
 (defn hohmann-score
   "Return information about the outport sensors for the Hohmann example"
   [vm]
   (println (:counter vm))
   (let [x (:outport vm)
-	pc @(:counter vm)
-	score @(x 0)
-	fuel-remaining @(x 1)
-	sx-relative @(x 2)
-	sy-relative @(x 3)
-	target-radius @(x 4)]
+	pc (:counter vm)
+	score (x 0)
+	fuel-remaining (x 1)
+	sx-relative (x 2)
+	sy-relative (x 3)
+	target-radius (x 4)]
     [pc score fuel-remaining sx-relative sy-relative target-radius]))
     
 (defn hohmann-updater 
-  "Given the state of the virtual machine, determine what to boost"
+  "Given the state of the virtual machine, determine what to boost and return
+   the new state of the virtual machine"
   [vm]
-  (swap! ((:inport vm) 0x3E80) (fn [_] 1001)))
+  (memory-put vm :inport 0x3E80 1001))
 
 (defn create-vm
   [instructions]
@@ -240,15 +227,14 @@
   "Run the virtual machine with the decoded instructions.  
    Reset the program counter when complete"
   [vm ops update-input]
-  (update-input vm)
-  (doseq [[op args] ops]     
-    (apply op (list vm args)) ;; dodgy side effect
-    (swap! (:counter vm) inc))
-  (swap! (:counter vm) (fn [_] 0))
-  (swap! (:firstrun vm) (fn [_] false))
-  vm)
+  (reduce 
+   (fn [v [op args]] 
+     (increment-counter (apply op (list v args))))
+   (update-input vm)
+   ops))
 
+; [0 0.0 10000.0 -6556995.342902722 7814.932738513376 4.2164E7]
 (defn run []
   (let [x (create-vm bin1)
 	ops (map first bin1)]
-    (time (hohmann-score (first (take 1 (repeatedly #(run-machine x ops hohmann-updater))))))))
+    (time (hohmann-score (last (take 1000 (repeatedly #(run-machine x ops hohmann-updater))))))))

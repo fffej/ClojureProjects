@@ -112,14 +112,7 @@
 		 (= cmp 'GTZ) (>= val 0)
 		 :else (assert false))]
     (trace 'Cmpz (format "%s %s --> %s" cmp y status))
-    (struct virtualmachine 
-	    (:mem vm)
-	    (:counter vm)
-	    (:inport vm)
-	    (:outport vm)
-	    status
-	    (:firstrun vm)
-	    (:user vm))))
+    (assoc vm :status status)))
 
 (def d-type-instructions {1 add, 2 sub, 3 mult, 4 div, 5 output, 6 phi})
 (def s-type-instructions {0 noop, 1 cmpz, 2 sqrt, 3 copy, 4 input})
@@ -221,15 +214,12 @@
 
 (def bin1 (read-data (get-bytes bin1)))
 
-;; TODO This could be purely functional, if I just returned
-;; a copy of the entire VM after each operation was applied.
 (defn run-machine
-  "Run the virtual machine with the decoded instructions.  
-   Reset the program counter when complete"
+  "Run the virtual machine with the decoded instructions."
   [vm ops update-input]
   (reduce 
    (fn [v [op args]] 
-     (increment-counter (apply op (list v args))))
+     (increment-counter (op v args)))
    (update-input vm)
    ops))
 

@@ -5,7 +5,7 @@
   (:use [clojure.contrib.test-is]))
 
 (defn tree-search
-  "Find a state that satisfic goal? Start with states, and search 
+  "Find a state that satisfies goal? Start with states, and search 
    according to successors and combiner"
   [states goal? successors combiner]
   (dbg :search "Search %s" states)
@@ -23,16 +23,6 @@
   [start goal? successors]
   (tree-search (list start) goal? successors concat))
 
-(defn binary-tree
-  [x]
-  (list (* 2 x) (+ 1 (* 2 x))))
-
-(defn finite-binary-tree
-  "Return a successor function that generates a binary tree 
-   with n nodes"
-  [n]
-  (fn [x] (filter (partial > n) (binary-tree x))))
-
 (defn reverse-concat
   "Prepend y to start of x"
   [x y]
@@ -42,11 +32,6 @@
   "Search old states first until goal is reached."
   [start goal? successors]
   (tree-search (list start) goal? successors reverse-concat))
-
-(defn diff
-  "Return the function that finds the difference from num."
-  [num]
-  (fn [x] (Math/abs (- x num))))
 
 (defn sorter
   "Return a combiner function that sorts according to cost-fn"
@@ -59,14 +44,6 @@
   [start goal? successors cost-fn]
   (tree-search (list start) goal? successors (sorter cost-fn)))
 
-(defn price-is-right 
-  "Return a function that measures the difference from price, but
-  gives a big penalty for doing over price."
-  [price]
-  (fn [x] (if (> x price)
-    (Integer/MAX_VALUE)
-    (- price x))))
-
 (defn beam-search
   "Search highest scoring states first until goal is reached"
   [start goal? successors cost-fn beam-width]
@@ -76,89 +53,107 @@
 		   (if (> beam-width (count sorted))
 		     sorted
 		     (take beam-width sorted))))))
-  
-;;; As an example of search, let's consider chess and in particular
-;;; the case where we have a queen + king against a single king.
-;;; What's the best route to mate?
 
-(defn add-vec
-  [pos delta]
-  (map + pos delta))
+(defn iter-wide-search
+  "Search, increasing beam width from width to max.
+   Return the first solution found at any width"
+  [start goal? successors cost-fn width max]
+  (dbg :search (format "Width: %s" width))
+  (when-not (> width max)
+    (or (beam-search start goal? successors cost-fn width)
+	(recur start goal? successors cost-fn (inc width) max))))
 
-;; A board consists of the pieces on it
-(defstruct board :white-queen :white-king :black-king :white-turn?)
+ 
+(defn binary-tree
+  [x]
+  (list (* 2 x) (+ 1 (* 2 x))))
 
-;; Valid moves that a queen or king can make
-(def directions
-     #{[1 1] [1 0] [1 -1] [0 1] [0 -1] [-1 1] [-1 0] [-1 -1]})
+(defn finite-binary-tree
+  "Return a successor function that generates a binary tree 
+   with n nodes"
+  [n]
+  (fn [x] (filter (partial > n) (binary-tree x))))
 
-(defn valid-position?
-  "Is the supplied position on the chess board?"
-  [pos]
-  (let [x (first pos) y (second pos)]
-    (and (>= x 0) (< x 8) (>= y 0) (< y 8))))
+;;; As an example of search, let's consider darts.
+(defstruct game :current-score :throws)
 
-(defn queen-checked?
-  "Does the queen check the king?"
-  [[qx qy] [kx ky]]
-  (or (= qx kx) 
-      (= qy ky)
-      (= (Math/abs (- qx kx)) (Math/abs (- qy ky)))))
+(def darts
+     (concat
+      (range 1 21)
+      (map (partial * 2) (range 1 21))
+      (map (partial * 3) (range 1 21))
+      '(25 50)))
+      
+(def finishes
+     (set (concat
+	   (map (partial * 2) (range 1 21))
+	   '(25 50))))
 
-(defn adjacent?
-  "Are the two pieces next to each other?"
-  [[x1 y1] [x2 y2]]
-  (let [d1 (Math/abs (- x1 x2))
-	d2 (Math/abs (- y1 y2))]
-    (and (<= d1 1) (<= d2 1))))
+(defn next-throw
+  "Given a value return the next valid darts"
+  [n]
+  (filter
+   (partial not= 1)
+   (filter 
+    (partial <= 0)
+    (map (fn [x] 
+	   (let [result (- n x)]
+	     (if (not= result 0)
+	       result
+	       (if (and (zero? result) (finishes x)) 0 -1))))
+	 darts))))
 
-(defn queen-moves
-  [queen]
-  (set
-   (mapcat
-    (fn [delta] (take-while valid-position? (iterate (partial add-vec delta) queen)))
-    directions)))
+(defn next-dart
+  "Given a value, return the next darts and record the state"
+  [d]
+  (let [prev-throws (:throws d)]
+    (map
+     (fn [new-score]
+       (struct game 
+	new-score
+	(conj prev-throws new-score)))
+     (next-throw (:current-score d)))))
 
-(defn valid-board?
-  [board]
-  (let [wk (:white-king board)
-	wq (:white-queen board)
-	bk (:black-king board)]
-    (and
-     (every? valid-position? [wk wq bk])
-     (not (queen-checked? wq bk))
-     (not (adjacent? wk bk))
-     (= 3 (count #{wk wq bk})))))
+(defn finished?
+  [d]
+  (zero? (:current-score d)))
 
-(defn next-moves
-  "The set of next states"
-  [b]
-  (let [wk (:white-king b)
-	wq (:white-queen b)
-	bk (:black-king b)]
-    (filter valid-board?
-	    (if (:white-turn? b)
-	      (concat
-	       (map (fn [x] (struct board x wk bk false)) (queen-moves wq))
-	       (map (fn [x] (struct board (add-vec wk x) wq bk false)) directions))
-	      (map (fn [x] (struct board wk wq (add-vec bk x) true)) directions)))))
-		    
-(defn check-mate?
-  [board]
-  (let [wk (:white-king board)
-	wq (:white-queen board)
-	bk (:black-king board)]
-    (println "BOARD=" board)
-    (if (:white-turn? board)
-      false
-      (and
-       (queen-checked? wq bk)
-       (every? (partial queen-checked? wq)
-	       (filter valid-position? (map (partial add-vec bk) directions)))))))
+(defn solve-darts-depth-first
+  [n]
+  (depth-first-search 
+   (struct game n []) 
+   finished?
+   next-dart))
 
-(defn calculate-mate
-  [b]
-  (breadth-first-search b check-mate? next-moves))
-	     
+;; TODO why does this suffer from a stack overflow?
+;; It should be slower yes, but break?
+(defn solve-darts-breadth-first
+  [n]
+  (breadth-first-search 
+   (struct game n [])
+   finished?
+   next-dart))
 
+(defn solve-darts-beam-search
+  [n]
+  (beam-search
+   (struct game n [])
+   finished?
+   next-dart
+   (fn [d] (/ (- (:current-score d) n) (count (:throws d))))
+   3))
 
+(defn solve-darts-iter
+  [n]
+  (iter-wide-search 
+   (struct game n [])
+   (fn [d] (zero? (:current-score d)))
+   next-dart
+   (fn [d] (/ (- (:current-score d) n) (count (:throws d))))
+   1
+   100))
+   
+
+;; Notice how the problem isn't solved 
+;; (solve-darts-beam-search 141) doesn't give a global minimum
+;; because it focuses on short-term vs. long term goals

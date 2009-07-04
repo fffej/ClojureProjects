@@ -85,9 +85,7 @@
       '(25 50)))
       
 (def finishes
-     (set (concat
-	   (map (partial * 2) (range 1 21))
-	   '(25 50))))
+     (set (concat (map (partial * 2) (range 1 21)) '(25 50))))
 
 (defn next-throw
   "Given a value return the next valid darts"
@@ -100,23 +98,19 @@
 	   (let [result (- n x)]
 	     (if (not= result 0)
 	       result
-	       (if (and (zero? result) (finishes x)) 0 -1))))
+	       (if (finishes x) 0 -1))))
 	 darts))))
 
 (defn next-dart
   "Given a value, return the next darts and record the state"
   [d]
-  (let [prev-throws (:throws d)]
-    (map
-     (fn [new-score]
-       (struct game 
-	new-score
-	(conj prev-throws new-score)))
-     (next-throw (:current-score d)))))
+  (map (fn [new-score]
+	 (struct game 
+		 new-score
+		 (conj (:throws d) new-score)))
+       (next-throw (:current-score d))))
 
-(defn finished?
-  [d]
-  (zero? (:current-score d)))
+(defn finished? [d] (zero? (:current-score d)))
 
 (defn solve-darts-depth-first
   [n]
@@ -129,10 +123,7 @@
 ;; It should be slower yes, but break?
 (defn solve-darts-breadth-first
   [n]
-  (breadth-first-search 
-   (struct game n [])
-   finished?
-   next-dart))
+  (breadth-first-search (struct game n []) finished? next-dart))
 
 (defn solve-darts-beam-search
   [n]
@@ -152,8 +143,4 @@
    (fn [d] (/ (- (:current-score d) n) (count (:throws d))))
    1
    100))
-   
-
-;; Notice how the problem isn't solved 
-;; (solve-darts-beam-search 141) doesn't give a global minimum
-;; because it focuses on short-term vs. long term goals
+ 

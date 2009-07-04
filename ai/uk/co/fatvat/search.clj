@@ -63,18 +63,42 @@
     (or (beam-search start goal? successors cost-fn width)
 	(recur start goal? successors cost-fn (inc width) max))))
 
- 
-(defn binary-tree
+;; Searching graphs
+(defn new-states
+  "Generate successor states that have not been seen before."
+  [states successors state-eq old-states]
+  (remove
+   (fn [state]
+      (or (some (partial state-eq state) old-states)
+	  (some (partial state-eq state) states)))
+   (successors (first states))))
+
+(defn graph-search
+  "Find a state that statisfies goal?.  Start with states and search
+   according to successors and combiner.  Don't repeat same state twice"
+  ([states goal? successors combiner]
+     (graph-search states goal? successors combiner = #{}))
+  ([states goal? successors combiner old-states]
+     (graph-search states goal? successors combiner = old-states))
+  ([states goal? successors combiner state-eq old-states]
+     (dbg :search "Search: %s" states)
+     (cond
+       (empty? states) nil
+       (goal? (first states)) (first states)
+       :else (recur
+	      (combiner (new-states states successors state-eq old-states)
+			(rest states))
+	      goal? successors combiner state-eq
+	      (conj old-states (first states))))))
+      
+(defn next2
   [x]
-  (list (* 2 x) (+ 1 (* 2 x))))
+  (list (+ x 1) (+ x 2)))
+  
 
-(defn finite-binary-tree
-  "Return a successor function that generates a binary tree 
-   with n nodes"
-  [n]
-  (fn [x] (filter (partial > n) (binary-tree x))))
 
-;;; As an example of search, let's consider darts.
+
+;;; As an example of tree search, let's consider darts.
 (defstruct game :current-score :throws)
 
 (def darts

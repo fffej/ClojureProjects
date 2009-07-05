@@ -92,7 +92,12 @@
 	      (conj old-states (first states))))))
 
 ;;; Implementation of A* search algorithm
-(defstruct path :print-function :state :previous :cost-so-far :total-cost)
+(defstruct path :print-func :state :previous :cost-so-far :total-cost)
+
+(defn make-path
+  "Create a new path object"
+  [printfunc state previous cost-so-far total-cost]
+  (struct path printfunc state previous cost-so-far total-cost))
 
 (defn find-path
   "Find the path with this state amongst a list of paths"
@@ -116,7 +121,6 @@
   (when-not (nil? path)
     (cons (:state path) (path-states (:previous path)))))
   
-
 (defn a*-search
   "Find a path whose state satisfies goal?.  Start with paths, and expand
    successors, exploring least cost first.  When there are duplicate states,
@@ -130,12 +134,27 @@
      (cond
        (empty? paths) nil
        (goal? (:state (first paths))) 4 ;;(values (first paths) paths)
-       :else (recur paths goal? successors cost-fn cost-left-fn state-eq old-paths))))
-
-		 
-       
-
-      
+       :else (let [path (first paths)
+		   rest-paths (pop paths)
+		   old-paths-a (atom (insert-path path old-paths)) ;; mutable wrappers
+		   paths-a (atom rest-paths)
+		   state (:state path)]
+	       (doseq [state2 (successors state)]
+		 (let [cost (+ (:cost-so-far path)
+			       (cost-fn state state2))
+		       cost2 (cost-left-fn state2)
+		       path2 (make-path (:print-func path) state2 path cost (+ cost cost2))
+		       old-a (atom nil)]
+		   (cond
+		     (not (nil? (swap! old-a (fn [_] (find-path state2 @paths-a state-eq)))))
+  		           (when (better-path? path2 @old-a)
+			     (swap! paths-a (fn [_] (insert-path path2 (remove (partial = @old-a) @paths-a)))))
+		     (not (nil? (swap! old-a (fn [_] (find-path state2 @old-paths-a  state-eq)))))
+		           (when (better-path? path2 @old-a)
+			     (swap! paths-a (fn [_] (insert-path path2 @paths-a)))
+			     (swap! old-paths-a (fn [x] (remove (partial = @old-a) x))))
+		     :else (swap! paths-a (fn [p] (insert-path path2 p))))))
+		   (recur @paths-a goal? successors cost-fn cost-left-fn state-eq @old-paths-a)))))
 
 (defn next2
   [x]

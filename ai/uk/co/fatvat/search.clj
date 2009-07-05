@@ -90,7 +90,53 @@
 			(rest states))
 	      goal? successors combiner state-eq
 	      (conj old-states (first states))))))
+
+;;; Implementation of A* search algorithm
+(defstruct path :print-function :state :previous :cost-so-far :total-cost)
+
+(defn find-path
+  "Find the path with this state amongst a list of paths"
+  [state paths state-eq]
+  (filter (fn [path] (state-eq (:state path) state)) paths))
+
+(defn better-path?
+  "Is path1 cheaper than path2?"
+  [path1 path2]
+  (< (:total-cost path1) (:total-cost path2)))
+
+(defn insert-path
+  [path paths]
+  "Put path in the right position, sorted by total cost."
+  (sort better-path? (cons path paths)))
+
+;; TODO use recur
+(defn path-states
+  "Collect the states along this path."
+  [path]
+  (when-not (nil? path)
+    (cons (:state path) (path-states (:previous path)))))
+  
+
+(defn a*-search
+  "Find a path whose state satisfies goal?.  Start with paths, and expand
+   successors, exploring least cost first.  When there are duplicate states,
+   keep the one with the lower cost and discard the other."
+  ([paths goal? successors cost-fn cost-left-fn]
+     (a*-search paths goal? successors cost-fn cost-left-fn = #{}))
+  ([paths goal? successors cost-fn cost-left-fn state-eq]
+     (a*-search paths goal? successors cost-fn cost-left-fn state-eq #{}))
+  ([paths goal? successors cost-fn cost-left-fn state-eq old-paths]
+     (dbg :search ";; Search: %s" paths)
+     (cond
+       (empty? paths) nil
+       (goal? (:state (first paths))) 4 ;;(values (first paths) paths)
+       :else (recur paths goal? successors cost-fn cost-left-fn state-eq old-paths))))
+
+		 
+       
+
       
+
 (defn next2
   [x]
   (list (+ x 1) (+ x 2)))

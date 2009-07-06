@@ -92,23 +92,30 @@
 	      (conj old-states (first states))))))
 
 ;;; Implementation of A* search algorithm
-(defstruct path :print-func :state :previous :cost-so-far :total-cost)
+(defstruct path :state :previous :cost-so-far :total-cost)
+
+(defn path-to-string
+  [path]
+  (format "Path to %s, cost %s" (:state path) (:total-cost path)))
 
 (defn make-path
   "Create a new path object"
-  [printfunc state previous cost-so-far total-cost]
-  (struct path printfunc state previous cost-so-far total-cost))
+  [state previous cost-so-far total-cost]
+  (struct path state previous cost-so-far total-cost))
 
 (defn find-path
   "Find the path with this state amongst a list of paths"
   [state paths state-eq]
-  (filter (fn [path] (state-eq (:state path) state)) paths))
+  (let [x (filter (fn [path] (state-eq (:state path) state)) paths)]
+    (when-not (empty? x)
+      (first x))))
 
 (defn better-path?
   "Is path1 cheaper than path2?"
   [path1 path2]
   (< (:total-cost path1) (:total-cost path2)))
 
+;; TODO a bit inefficient!
 (defn insert-path
   [path paths]
   "Put path in the right position, sorted by total cost."
@@ -120,6 +127,9 @@
   [path]
   (when-not (nil? path)
     (cons (:state path) (path-states (:previous path)))))
+
+(defn setf [atom val]
+  (swap! atom (constantly val)))
   
 (defn a*-search
   "Find a path whose state satisfies goal?.  Start with paths, and expand
@@ -130,12 +140,12 @@
   ([paths goal? successors cost-fn cost-left-fn state-eq]
      (a*-search paths goal? successors cost-fn cost-left-fn state-eq #{}))
   ([paths goal? successors cost-fn cost-left-fn state-eq old-paths]
-     (dbg :search ";; Search: %s" paths)
+     (dbg :search ";; Search: %s" (map path-to-string paths))
      (cond
        (empty? paths) nil
-       (goal? (:state (first paths))) 4 ;;(values (first paths) paths)
+       (goal? (:state (first paths))) (first paths)
        :else (let [path (first paths)
-		   rest-paths (pop paths)
+		   rest-paths (rest paths)
 		   old-paths-a (atom (insert-path path old-paths)) ;; mutable wrappers
 		   paths-a (atom rest-paths)
 		   state (:state path)]
@@ -143,26 +153,23 @@
 		 (let [cost (+ (:cost-so-far path)
 			       (cost-fn state state2))
 		       cost2 (cost-left-fn state2)
-		       path2 (make-path (:print-func path) state2 path cost (+ cost cost2))
+		       path2 (make-path state2 path cost (+ cost cost2))
 		       old-a (atom nil)]
 		   (cond
-		     (not (nil? (swap! old-a (fn [_] (find-path state2 @paths-a state-eq)))))
+		     (not (empty? (setf old-a (find-path state2 @paths-a state-eq))))
   		           (when (better-path? path2 @old-a)
-			     (swap! paths-a (fn [_] (insert-path path2 (remove (partial = @old-a) @paths-a)))))
-		     (not (nil? (swap! old-a (fn [_] (find-path state2 @old-paths-a  state-eq)))))
+			     (setf paths-a (insert-path path2 (remove (partial = @old-a) @paths-a))))
+		     (not (empty? (setf old-a (find-path state2 @old-paths-a  state-eq))))
 		           (when (better-path? path2 @old-a)
-			     (swap! paths-a (fn [_] (insert-path path2 @paths-a)))
-			     (swap! old-paths-a (fn [x] (remove (partial = @old-a) x))))
-		     :else (swap! paths-a (fn [p] (insert-path path2 p))))))
-		   (recur @paths-a goal? successors cost-fn cost-left-fn state-eq @old-paths-a)))))
+			     (setf paths-a (insert-path path2 @paths-a))
+			     (setf old-paths-a (remove (partial = @old-a) @old-paths-a)))
+		     :else (setf paths-a (insert-path path2 @paths-a)))))
+	       (recur @paths-a goal? successors cost-fn cost-left-fn state-eq @old-paths-a)))))
 
 (defn next2
   [x]
   (list (+ x 1) (+ x 2)))
   
-
-
-
 ;;; As an example of tree search, let's consider darts.
 (defstruct game :current-score :throws)
 
@@ -233,3 +240,13 @@
    1
    100))
  
+;; TODO
+(defn solve-darts-a*
+  [n]
+  (a*-search
+   (list (make-path n [] 0 0))
+   (fn [d] (zero? d))
+   next-throw
+   (constantly 1)
+   (fn [x] (Math/abs (- x 0)))))
+   

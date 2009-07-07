@@ -124,12 +124,14 @@
   "Put path in the right position, sorted by total cost."
   (sort better-path? (cons path paths)))
 
-;; TODO use recur
 (defn path-states
   "Collect the states along this path."
   [path]
   (when-not (nil? path)
-    (cons (:state path) (path-states (:previous path)))))
+    (lazy-seq 
+      (cons 
+       (:state path) 
+       (path-states (:previous path))))))
 
 (defn setf [atom val]
   (swap! atom (constantly val)))
@@ -244,6 +246,14 @@
    100))
  
 ;; A* Search Algorithm used to search a maze.
+(def grid-size 30)
+
+;; A collection of walls 
+(def walls (atom #{}))
+
+;; The route to the finish
+(def route (atom #{}))
+
 (defstruct point :x :y)
 
 (defn make-cost-and-goal-fn 
@@ -256,35 +266,40 @@
      (and (= (:x g) x)
 	  (= (:y g) y)))])
 
-(defn make-point
-  [x y]
-  (struct point x y))
+(defn make-point [x y] (struct point x y))
 
 (defn make-successors-fn
   "Make a successors function with chance of a surrounding wall"
-  [wall]
+  [wall-locations]
   (fn [p]
     (let [neighbours #{[1 0] [-1 0] [0 1] [0 -1]}]
-      (remove 
-       (fn [_] (> wall (rand)))
-       (map 
-	(fn [[x y]] (make-point (+ x (:x p)) (+ y (:y p))))
-	neighbours)))))
+      (set
+       (remove 
+	(fn [pt]
+	  (or (< (:x pt) 0)
+	      (< (:y pt) 0)
+	      (>= (:x pt) grid-size)
+	      (>= (:y pt) grid-size)
+	      (wall-locations [(:x pt) (:y pt)])))
+	(map 
+	 (fn [[x y]] (make-point (+ x (:x p)) (+ y (:y p))))
+	 neighbours))))))
 
-(defn search-maze-basic
-  [start goal]
-  (let [[costf goal?] (make-cost-and-goal-fn (:x goal) (:y goal))]
-    (graph-search (list start) goal? (make-successors-fn 0) concat)))
+(defn get-points-on
+  "Get the points on the path"
+  [solution]
+  (let [s (:state solution)
+	p (:previous solution)]
+    (when-not (nil? p)
+      (lazy-seq 
+      (cons
+       [(:x s) (:y s)]
+       (get-points-on p))))))
 
-(defn search-maze-a*
-  [start goal]
-  (let [[costf goal?] (make-cost-and-goal-fn (:x goal) (:y goal))]
-    (a*-search (list (make-path start [] 0 0)) goal? (make-successors-fn 0) (constantly 1) costf)))
-
-(def grid-size 32)
-
-;; A collection of walls 
-(def walls (atom #{}))
+(defn set-route-from
+  "Set the route"
+  [solution]
+  (swap! route (constantly (set (get-points-on solution)))))
 
 (def canvas 
      (proxy [JPanel] [] 
@@ -294,11 +309,11 @@
      (let [sq-size (/ (min (.getHeight this) (.getWidth this)) grid-size)]
        (doseq [x (range 0 grid-size)]
 	 (doseq [y (range 0 grid-size)]
-	   (println x y)
 	   (cond 
 	     (= [0 0] [x y]) (.setColor g Color/GREEN)
 	     (= [(dec grid-size) (dec grid-size)] [x y]) (.setColor g Color/RED)
 	     (@walls [x y]) (.setColor g Color/BLACK)
+	     (@route [x y]) (.setColor g Color/PINK)
 	     :else (.setColor g Color/BLUE))
 	   (doto g
 	     (.fillRect (* x sq-size) (* y sq-size) (dec sq-size) (dec sq-size)))))))))
@@ -321,6 +336,15 @@
 			     (if (walls [x y])
 			       (disj walls [x y])
 			       (conj walls [x y]))))
+	      (.repaint canvas))
+	    (let [[cost-fn goal?] (make-cost-and-goal-fn (dec grid-size) (dec grid-size))
+		  solution (a*-search 
+			    (list (make-path (make-point 0 0) nil 0 0))
+			    goal?
+			    (make-successors-fn @walls)
+			    (constantly 1) ;; cost per unit is 1
+			    cost-fn)]
+	      (set-route-from solution)
 	      (.repaint canvas)))))))
     (doto frame
       (.add canvas)

@@ -2,7 +2,10 @@
 ;;; jeff.foster.acm.org
 (ns uk.co.fatvat.search
   (:use [uk.co.fatvat.debug])
-  (:use [clojure.contrib.test-is]))
+  (:use [clojure.contrib.test-is])
+  (:import (javax.swing JFrame JPanel))
+  (:import (java.awt.event ActionListener MouseListener MouseAdapter MouseEvent))
+  (:import (java.awt Color)))
 
 (defn tree-search
   "Find a state that satisfies goal? Start with states, and search 
@@ -140,7 +143,7 @@
   ([paths goal? successors cost-fn cost-left-fn state-eq]
      (a*-search paths goal? successors cost-fn cost-left-fn state-eq #{}))
   ([paths goal? successors cost-fn cost-left-fn state-eq old-paths]
-     (dbg :search ";; Search: %s" (map path-to-string paths))
+     (dbg :search ";; Search: %s" paths)
      (cond
        (empty? paths) nil
        (goal? (:state (first paths))) (first paths)
@@ -240,13 +243,89 @@
    1
    100))
  
-;; TODO
-(defn solve-darts-a*
-  [n]
-  (a*-search
-   (list (make-path n [] 0 0))
-   (fn [d] (zero? d))
-   next-throw
-   (constantly 1)
-   (fn [x] (Math/abs (- x 0)))))
-   
+;; A* Search Algorithm used to search a maze.
+(defstruct point :x :y)
+
+(defn make-cost-and-goal-fn 
+  "Make a goal function so the point reaches the goal"
+  [x y]
+  [(fn [g]
+     (let [dx (- x (:x g)) dy (- y (:y g))]
+       (Math/sqrt (+ (* dx dx) (* dy dy)))))
+   (fn [g]
+     (and (= (:x g) x)
+	  (= (:y g) y)))])
+
+(defn make-point
+  [x y]
+  (struct point x y))
+
+(defn make-successors-fn
+  "Make a successors function with chance of a surrounding wall"
+  [wall]
+  (fn [p]
+    (let [neighbours #{[1 0] [-1 0] [0 1] [0 -1]}]
+      (remove 
+       (fn [_] (> wall (rand)))
+       (map 
+	(fn [[x y]] (make-point (+ x (:x p)) (+ y (:y p))))
+	neighbours)))))
+
+(defn search-maze-basic
+  [start goal]
+  (let [[costf goal?] (make-cost-and-goal-fn (:x goal) (:y goal))]
+    (graph-search (list start) goal? (make-successors-fn 0) concat)))
+
+(defn search-maze-a*
+  [start goal]
+  (let [[costf goal?] (make-cost-and-goal-fn (:x goal) (:y goal))]
+    (a*-search (list (make-path start [] 0 0)) goal? (make-successors-fn 0) (constantly 1) costf)))
+
+(def grid-size 32)
+
+;; A collection of walls 
+(def walls (atom #{}))
+
+(def canvas 
+     (proxy [JPanel] [] 
+       (paintComponent 
+	[g]
+     (proxy-super paintComponent g)
+     (let [sq-size (/ (min (.getHeight this) (.getWidth this)) grid-size)]
+       (doseq [x (range 0 grid-size)]
+	 (doseq [y (range 0 grid-size)]
+	   (println x y)
+	   (cond 
+	     (= [0 0] [x y]) (.setColor g Color/GREEN)
+	     (= [(dec grid-size) (dec grid-size)] [x y]) (.setColor g Color/RED)
+	     (@walls [x y]) (.setColor g Color/BLACK)
+	     :else (.setColor g Color/BLUE))
+	   (doto g
+	     (.fillRect (* x sq-size) (* y sq-size) (dec sq-size) (dec sq-size)))))))))
+
+(defn visualize
+  []
+  "A quick and dirty visualization of A* search on a 100 x 100 grid"
+  (let [frame (JFrame. "A* Search Algorithm Visualization")
+	[costf goal?] (make-cost-and-goal-fn 50 50)]
+    (doto canvas
+      (.addMouseListener 
+       (proxy [MouseAdapter] []
+	 (mouseClicked 
+	  [e]
+	  (if (= (MouseEvent/BUTTON1) (.getButton e))
+	    (let [sq-size (/ (min (.getHeight canvas) (.getWidth canvas)) grid-size)
+		  x (int (/ (.getX e) sq-size))
+		  y (int (/ (.getY e) sq-size))]
+	      (swap! walls (fn [walls] 
+			     (if (walls [x y])
+			       (disj walls [x y])
+			       (conj walls [x y]))))
+	      (.repaint canvas)))))))
+    (doto frame
+      (.add canvas)
+      (.setSize 600 600)
+      (.setResizable true)
+      (.setVisible true))))
+    
+	

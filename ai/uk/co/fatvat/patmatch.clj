@@ -1,5 +1,7 @@
 ;;; jeff.foster@acm.org
 (ns uk.co.fatvat.patmatch
+  (:use [uk.co.fatvat.debug])
+  (:use [clojure.test])
   (:use [clojure.contrib.def]))
 
 (defvar fail {:fail :fail} "Sentinel value marking no bindings")
@@ -7,13 +9,14 @@
 (defvar no-bindings {} "Successful match with no bindings")
 
 (declare variable? match-variable segment-pattern? segment-matcher
-	 single-pattern? single-matcher)
+	 single-pattern? single-matcher segment-match-fn)
 
 (defn pat-match
   "Match pattern against input in the context of bindings"
   ([pattern input]
      (pat-match pattern input no-bindings))
   ([pattern input bindings]
+     (dbg :patmatch (format "pat-match %s %s %s" pattern input bindings))
      (cond
        (= bindings fail) fail
        (variable? pattern) (match-variable pattern input bindings)
@@ -27,6 +30,11 @@
 					       bindings))
        :else fail)))
 
+(defn segment-matcher
+  "Call the right function for this kind of segment pattern."
+  [pattern input bindings]
+  ((segment-match-fn (ffirst pattern)) pattern input bindings))
+
 (defn position
   "First index within the sequence satisfying test"
   ([test coll]
@@ -34,6 +42,7 @@
   ([test coll start]
      (position test (nthnext coll start) start start))
   ([test coll start current-pos]
+     (dbg :patmatch (format "position %s %s %s %s" test coll start current-pos))
      (cond
        (empty? coll) nil
        (test (first coll)) current-pos
@@ -42,6 +51,7 @@
 (defn match-variable
   "Does var match input? Uses (or updates) and return bindings."
   [var input bindings]
+  (dbg :patmatch (format "match-variable %s %s %s" var input bindings))
   (let [binding-value (bindings var)]
     (cond
       (nil? binding-value) (assoc bindings var input)
@@ -50,15 +60,23 @@
 
 (defn first-match-pos
   "Find the first position that pat1 could possibly match input,
-   starting at position start.  IF pat1 is non-constant, then jsut
+   starting at position start.  If pat1 is non-constant, then jsut
    return start."
-  [pat1 input start])
+  [pat1 input start]
+  (dbg :patmatch (format "first-match-pos %s %s %s" pat1 input start))
+  (cond
+    (and (not (sequential? pat1)) (not (variable? pat1)))
+      (position (partial = pat1) input start)
+    (< start (count input)) start
+    :else nil))
+    
 
 (defn segment-match
   "Match the segment patter ((?* var ) . pat) against input."
   ([pattern input bindings]
      (segment-match pattern input bindings 0))
   ([pattern input bindings start]
+     (dbg :patmatch (format "Segment Match %s %s %s" pattern input bindings start))
      (let [var (second (first pattern))
 	   pat (rest pattern)]
        (if (empty? pat)
@@ -173,7 +191,7 @@
        (symbol? (first (first pattern)))
        (segment-match-fn (first (first pattern)))))
 
-
-
-	   
-  
+(deftest test-patmatch
+  (is (= {'?x '(b c)} (pat-match '(a (?* ?x) d) '(a b c d))))
+  (is (= {'?y '(b c), '?x '()} (pat-match '(a (?* ?x) (?* ?y) d) '(a b c d)))))
+    

@@ -202,5 +202,5 @@
 
 (deftest test-patmatch-if
   (is (= nil (pat-match '(?x ?op ?y (?if (?op ?x ?y))) '(3 > 4))))
-  (is (= 1 (pat-match '(?x ?op ?y is ?z (?if (= (?op ?x ?y) ?z))) '(3 + 4 is 7)))))
+  (is (= {'?z 7, '?y 4, '?op '+, '?x 3} (pat-match '(?x ?op ?y is ?z (?if (= (?op ?x ?y) ?z))) '(3 + 4 is 7)))))
     

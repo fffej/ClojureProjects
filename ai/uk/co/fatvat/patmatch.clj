@@ -1,6 +1,7 @@
 ;;; jeff.foster@acm.org
 (ns uk.co.fatvat.patmatch
   (:use [uk.co.fatvat.debug])
+  (:use [clojure.walk])
   (:use [clojure.test])
   (:use [clojure.contrib.def]))
 
@@ -142,8 +143,11 @@
 
 (defn match-if
   "Test an arbitrary expression involving variables."
-  [pattern input bindings])
-  ;; ProgV doesn't have a direct replacement.  Will ponder
+  [pattern input bindings]
+  (dbg :patmatch (format "match-if %s %s %s" pattern input bindings))
+  (let [f (postwalk-replace bindings (second (first pattern)))]
+    (when (eval f)
+      (pat-match (rest pattern) input bindings))))
 
 (defvar
   dispatch-table
@@ -193,5 +197,10 @@
 
 (deftest test-patmatch
   (is (= {'?x '(b c)} (pat-match '(a (?* ?x) d) '(a b c d))))
-  (is (= {'?y '(b c), '?x '()} (pat-match '(a (?* ?x) (?* ?y) d) '(a b c d)))))
+  (is (= {'?y '(b c), '?x '()} (pat-match '(a (?* ?x) (?* ?y) d) '(a b c d))))
+  (is (= {'?y '(d), '?x '(b c)} (pat-match '(a (?* ?x) (?* ?y) ?x ?y) '(a b c d (b c) (d))))))
+
+(deftest test-patmatch-if
+  (is (= nil (pat-match '(?x ?op ?y (?if (?op ?x ?y))) '(3 > 4))))
+  (is (= 1 (pat-match '(?x ?op ?y is ?z (?if (= (?op ?x ?y) ?z))) '(3 + 4 is 7)))))
     

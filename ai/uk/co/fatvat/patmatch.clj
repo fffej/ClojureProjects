@@ -6,7 +6,38 @@
 
 (defvar no-bindings {} "Successful match with no bindings")
 
-(declare pat-match)
+(declare variable? match-variable segment-pattern? segment-matcher
+	 single-pattern? single-matcher)
+
+(defn pat-match
+  "Match pattern against input in the context of bindings"
+  ([pattern input]
+     (pat-match pattern input no-bindings))
+  ([pattern input bindings]
+     (cond
+       (= bindings fail) fail
+       (variable? pattern) (match-variable pattern input bindings)
+       (= pattern input) bindings
+       (segment-pattern? pattern) (segment-matcher pattern input bindings)
+       (single-pattern? pattern) (single-matcher pattern input bindings)
+       (and
+	(sequential? pattern)
+	(sequential? input)) (recur (rest pattern) (rest input)
+				    (pat-match (first pattern) (first input)
+					       bindings))
+       :else fail)))
+
+(defn position
+  "First index within the sequence satisfying test"
+  ([test coll]
+     (position test coll 0))
+  ([test coll start]
+     (position test (nthnext coll start) start start))
+  ([test coll start current-pos]
+     (cond
+       (empty? coll) nil
+       (test (first coll)) current-pos
+       :else (recur test (rest coll) start (inc current-pos)))))
 
 (defn match-variable
   "Does var match input? Uses (or updates) and return bindings."
@@ -23,7 +54,6 @@
    return start."
   [pat1 input start])
 
-;; TODO 
 (defn segment-match
   "Match the segment patter ((?* var ) . pat) against input."
   ([pattern input bindings]
@@ -32,7 +62,28 @@
      (let [var (second (first pattern))
 	   pat (rest pattern)]
        (if (empty? pat)
-	 (match-variable var input bindings)))))
+	 (match-variable var input bindings)
+	 (let [pos (first-match-pos (first pat) input start)]
+	   (if (nil? pos)
+	     fail
+	     (let [b2 (pat-match pat (map identity (subvec (vec input) pos))
+				 (match-variable var (map identity (subvec (vec input) 0 pos)) bindings))]
+	       (if (= b2 fail)
+		 (segment-match pattern input bindings (inc pos))
+		 b2))))))))
+
+(defn segment-match+ 
+  "Match one or more elements of input."
+  [pattern input bindings]
+  (segment-match pattern input bindings 1))
+
+(defn segment-match?
+  "Match zero or one element of input"
+  [pattern input bindings]
+  (let [var (second (first pattern))
+	pat (rest pattern)]
+    (or (pat-match (cons var pat) input bindings)
+	(pat-match pat input bindings))))
 
 (defn match-is
   "Succeed and bind var if the input satisfies pred,
@@ -71,7 +122,10 @@
     fail
     bindings))
 
-(declare segment-match segment-match+ segment-match? match-if)
+(defn match-if
+  "Test an arbitrary expression involving variables."
+  [pattern input bindings])
+  ;; ProgV doesn't have a direct replacement.  Will ponder
 
 (defvar
   dispatch-table
@@ -118,7 +172,8 @@
        (sequential? (first pattern))
        (symbol? (first (first pattern)))
        (segment-match-fn (first (first pattern)))))
-(declare pat-match)
+
+
 
 	   
   

@@ -198,9 +198,7 @@
 (deftest test-patmatch
   (is (= {'?x '(b c)} (pat-match '(a (?* ?x) d) '(a b c d))))
   (is (= {'?y '(b c), '?x '()} (pat-match '(a (?* ?x) (?* ?y) d) '(a b c d))))
-  (is (= {'?y '(d), '?x '(b c)} (pat-match '(a (?* ?x) (?* ?y) ?x ?y) '(a b c d (b c) (d))))))
-
-(deftest test-patmatch-if
+  (is (= {'?y '(d), '?x '(b c)} (pat-match '(a (?* ?x) (?* ?y) ?x ?y) '(a b c d (b c) (d)))))
   (is (= nil (pat-match '(?x ?op ?y (?if (?op ?x ?y))) '(3 > 4))))
   (is (= {'?z 7, '?y 4, '?op '+, '?x 3} (pat-match '(?x ?op ?y is ?z (?if (= (?op ?x ?y) ?z))) '(3 + 4 is 7)))))
     

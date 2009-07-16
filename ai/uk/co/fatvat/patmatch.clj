@@ -152,26 +152,18 @@
 (defvar
   dispatch-table
   {:single-match 
-   {'?is match-is
-    '?or match-or
-    '?and match-and
-    '?not match-not}
+   {'?is match-is '?or match-or '?and match-and '?not match-not}
    :segment-match 
-   {'?* segment-match
-    '?+ segment-match+
-    '?? segment-match?
-    '?if match-if}}
+   {'?* segment-match '?+ segment-match+ '?? segment-match? '?if match-if}}
   "Dispatch table")
 
 (defn single-match-fn
-  "Get the single-match function for x, 
-  if it is a symbol that has one."
+  "Get the single-match function for x, if it is a symbol that has one."
   [x]
   (when (symbol? x) ((dispatch-table :single-match) x)))
 
 (defn segment-match-fn
-  "Get the segment-match function for x, 
-  if it is a symbol that has one."
+  "Get the segment-match function for x, if it is a symbol that has one."
   [x]
   (when (symbol? x) ((dispatch-table :segment-match) x)))
 
@@ -195,10 +187,31 @@
        (symbol? (first (first pattern)))
        (segment-match-fn (first (first pattern)))))
 
+(defvar abbrev-table (atom {}) "Abbreviations table")
+
+(defn expand-pat-match-abbrev
+  "Expand out all pattern matching abbreviations in pat"
+  [pat]
+  (cond
+    (symbol? pat) (get @abbrev-table pat pat)
+    (empty? pat) pat
+    :else (lazy-seq
+            (cons (expand-pat-match-abbrev (first pat))
+                  (expand-pat-match-abbrev (rest pat))))))
+
+(defn pat-match-abbrev
+  "Define symbol as a macro standing for a pat-match pattern."
+  [symbol expansion]
+  (swap! abbrev-table (fn [x] (assoc x symbol expansion)))
+  (expand-pat-match-abbrev expansion))
+
 (deftest test-patmatch
   (is (= {'?x '(b c)} (pat-match '(a (?* ?x) d) '(a b c d))))
   (is (= {'?y '(b c), '?x '()} (pat-match '(a (?* ?x) (?* ?y) d) '(a b c d))))
   (is (= {'?y '(d), '?x '(b c)} (pat-match '(a (?* ?x) (?* ?y) ?x ?y) '(a b c d (b c) (d)))))
   (is (= nil (pat-match '(?x ?op ?y (?if (?op ?x ?y))) '(3 > 4))))
   (is (= {'?z 7, '?y 4, '?op '+, '?x 3} (pat-match '(?x ?op ?y is ?z (?if (= (?op ?x ?y) ?z))) '(3 + 4 is 7)))))
-    
+
+(deftest test-abbrev
+  (is (= {'?* '?x} (pat-match-abbrev '?x* '(?* ?x))))
+  (is (= {'?* '?y} (pat-match-abbrev '?y* '(?* ?y)))))

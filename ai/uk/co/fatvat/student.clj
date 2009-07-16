@@ -149,7 +149,8 @@
 (defn print-equations
   "Print a list of equations."
   [header equations]
-  (println (format "%s %s" header (map (comp first prefix->infix) equations))))
+  (println header equations))
+;  (println (format "%s %s" header (map (comp first prefix->infix) equations))))
 
 (defn unknown?
   [exp]
@@ -166,7 +167,7 @@
 
 (defn no-unknown
   "Returns true if there are no unknowns in exp"
-  [x exp]
+  [exp]
   (cond
     (unknown? exp) nil
     (not (sequential? exp)) true

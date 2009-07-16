@@ -205,6 +205,17 @@
   (swap! abbrev-table (fn [x] (assoc x symbol expansion)))
   (expand-pat-match-abbrev expansion))
 
+(defnk rule-based-translator
+  "Find the first rule in rules that matches input and apply the action
+   to that rule"
+  [input rules :matcher pat-match :rule-if first :rule-then rest :action replace]
+  (some 
+   (fn [rule]
+     (let [result (matcher (rule-if rule) input)]
+       (if (not= result fail)
+         (action result (rule-then rule)))))
+   rules))
+
 (deftest test-patmatch
   (is (= {'?x '(b c)} (pat-match '(a (?* ?x) d) '(a b c d))))
   (is (= {'?y '(b c), '?x '()} (pat-match '(a (?* ?x) (?* ?y) d) '(a b c d))))
@@ -215,3 +226,4 @@
 (deftest test-abbrev
   (is (= {'?* '?x} (pat-match-abbrev '?x* '(?* ?x))))
   (is (= {'?* '?y} (pat-match-abbrev '?y* '(?* ?y)))))
+

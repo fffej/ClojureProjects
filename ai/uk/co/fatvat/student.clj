@@ -1,7 +1,10 @@
 ;;; jeff.foster@acm.org
 (ns uk.co.fatvat.student
+  (:use clojure.contrib.trace)
   (:use clojure.walk)
   (:use clojure.contrib.def)
+  (:use clojure.test)
+  (:use uk.co.fatvat.debug)
   (:use uk.co.fatvat.patmatch))
 
 (defstruct rule :pattern :response)
@@ -24,6 +27,13 @@
   "Create an expression with the given lhs, rhs and operation"
   [lhs op rhs]
   (struct exp op lhs rhs))
+
+(defn mk-exp-infix
+  "Create an expression from the infix args"
+  [e]
+  (if (sequential? e)
+    (struct exp (first e) (mk-exp-infix (nth e 1)) (mk-exp-infix (nth e 2)))
+    e))
 
 (defn exp-args
   "The arguments of an expression"
@@ -108,6 +118,15 @@
   [words]
   (first words))
 
+(declare translate-to-expression)
+
+(defn translate-pair 
+  "Translate the value part of the pair into an equation or expression"
+  [pair]
+  (cons
+   (rest pair) ;; TODO binding-var?
+   (translate-to-expression (rest pair))))
+
 (defn translate-to-expression
   "Translate an English phrase into an equation or expression"
   [words]
@@ -119,14 +138,6 @@
                                     (replace (into {} (map (fn [x] (translate-pair x) bindings)))
                                              response)))
    (make-variable words)))
-
-(defn translate-pair 
-  "Translate the value part of the pair into an equation or expression"
-  [pair]
-  (cons
-   (rest pair) ;; TODO binding-var?
-   (translate-to-expression (rest pair))))
-
 
 (defn commutative?
   [op]
@@ -169,19 +180,25 @@
   "Returns true if there are no unknowns in exp"
   [exp]
   (cond
-    (unknown? exp) nil
-    (not (sequential? exp)) true
+    (unknown? exp) false
+    (not (exp? exp)) true
     (no-unknown (:lhs exp)) (no-unknown (:rhs exp))))
+
+(deftest test-no-unknown
+  (is (= true (no-unknown (mk-exp-infix '(+ 1 2)))))
+  (is (= false (no-unknown (mk-exp-infix '(+ 1 x)))))
+  (is (= false (no-unknown (mk-exp-infix '(+ 1 (* 2 y))))))
+  (is (= true (no-unknown (mk-exp-infix '(+ (+ 1 2) (+ 3 4)))))))
 
 (defn one-unknown
   "Returns the single unknown in exp, if there is exactly one." 
   [exp]
+  (println exp)
   (cond
     (unknown? exp) exp
     (not (sequential? exp)) nil
     (no-unknown (:lhs exp)) (one-unknown (:rhs exp))
-    (no-unknown (:rhs exp)) (one-unknown (:lhs exp))
-    :else nil))
+    (no-unknown (:rhs exp)) (one-unknown (:lhs exp))))
          
 (defn solve-arithmetic
   "Do arithmetic for the right-hand side"
@@ -191,6 +208,7 @@
 (defn isolate 
   "Isolate the lone x in e on the left-hand side of e"
   [e x]
+  (dbg :student (format "e=%s x=%s" e x))
   (cond
     ;; X = A ==> X = n
     (= (:lhs e) x) e
@@ -220,9 +238,11 @@
 (defn solve
   "Solve a system of equations by constraint propagation"
   [equations known]
+  (dbg :student (format "%s %s" equations known))
   (or
    (some (fn [equation]
            (let [x (one-unknown equation)]
+             (println "eqation " equation)
              (when x
                (let [answer (solve-arithmetic (isolate equation x))]
                  (solve (postwalk-replace {(:rhs answer) (:lhs answer)}
@@ -235,7 +255,7 @@
   "Print the equations and their solution"
   [equations]
   (print-equations "The equations to be solved are:" equations)
-  (print-equations "The solution is:" (solve equations nil)))
+  (print-equations "The solution is:" (solve (map mk-exp-infix equations) nil)))
 
 (defn student
   "Solve certain Algebra Word Problems."
@@ -243,3 +263,4 @@
   (solve-equations
    (create-list-of-equations
     (translate-to-expression (remove noise-word? words)))))
+

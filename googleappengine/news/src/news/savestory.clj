@@ -1,10 +1,13 @@
-(ns news.savestory                                    
-  (:use (news appengine))
-  (:gen-class :extends javax.servlet.http.HttpServlet))
+(ns news.savestory  
+  (:import [com.google.wave.api RobotMessageBundle])
+  (:gen-class :extends com.google.wave.api.AbstractRobotServlet))
                                       
-(defn -doGet                                                  
-  [_ request response]
-  (let [body (.getParameter request "storyLink")
-	title (.getParameter request "storyTitle")]    
-    (let [w (.getWriter response)]
-      (.println w (store {"body" body "title" title} "story")))))
+(defn -processEvents                                                  
+  [_ bundle]
+  (let [wavelet (.getWavelet bundle)]
+    (when (.wasSelfAdded bundle)
+      (let [blip (.appendBlip wavelet)
+            textview (.getDocument blip)]
+        (.append textview "Alive and Lispy")))
+    (filter (fn [e] (= (.getType e) (EventType/WAVELET_PARTICIPANTS_CHANGED))) (.getEvents bundle))
+

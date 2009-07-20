@@ -35,6 +35,13 @@
     (struct exp (first e) (mk-exp-infix (nth e 1)) (mk-exp-infix (nth e 2)))
     e))
 
+(defn eval-exp
+  "Gargh, why did I choose this representation?"
+  [e]
+  (if (exp? e)
+    ((:op e) (eval-exp (:lhs e)) (eval-exp (:rhs e)))
+    e))
+
 (defn exp-args
   "The arguments of an expression"
   [exp]
@@ -202,7 +209,7 @@
 (defn solve-arithmetic
   "Do arithmetic for the right-hand side"
   [equation]
-  (mk-exp (:lhs equation) '= (eval (:rhs equation))))
+  (mk-exp (:lhs equation) '= (eval-exp (:rhs equation))))
 
 (defn isolate 
   "Isolate the lone x in e on the left-hand side of e"
@@ -243,14 +250,13 @@
 (defn solve
   "Solve a system of equations by constraint propagation"
   [equations known]
-  (dbg :student (format "%s %s" equations known))
+  (dbg :student (format "SOLVE %s %s" equations known))
   (or
    (some (fn [equation]
            (let [x (one-unknown equation)]
-             (println "x " x)
              (when x
                (let [answer (solve-arithmetic (isolate equation x))]
-                 (solve (postwalk-replace {(:rhs answer) (:lhs answer)}
+                 (solve (postwalk-replace {(:lhs answer) (:rhs answer)}
                                           (remove (partial = equation) equations))
                         (cons answer known))))))
          equations)

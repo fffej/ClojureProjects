@@ -193,10 +193,9 @@
 (defn one-unknown
   "Returns the single unknown in exp, if there is exactly one." 
   [exp]
-  (println exp)
   (cond
     (unknown? exp) exp
-    (not (sequential? exp)) nil
+    (not (exp? exp)) nil
     (no-unknown (:lhs exp)) (one-unknown (:rhs exp))
     (no-unknown (:rhs exp)) (one-unknown (:lhs exp))))
          
@@ -242,7 +241,7 @@
   (or
    (some (fn [equation]
            (let [x (one-unknown equation)]
-             (println "eqation " equation)
+             (println "x " x)
              (when x
                (let [answer (solve-arithmetic (isolate equation x))]
                  (solve (postwalk-replace {(:rhs answer) (:lhs answer)}

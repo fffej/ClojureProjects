@@ -216,22 +216,28 @@
     (in-exp x (:rhs e)) (isolate (mk-exp (:rhs e) '= (:lhs e)) x)
 
     ;; f(X) * A = B ==> f(X) = B / A
-    (in-exp x (:lhs (:lhs e))) (isolate (mk-exp (:lhs (:lhs e)) '=
-                                               (mk-exp (:rhs e)
-                                                      (inverse-op (:op (:lhs e)))
-                                                      (:rhs (:lhs e))) x))
+    (in-exp x (:lhs (:lhs e))) (isolate (mk-exp (:lhs (:lhs e)) 
+                                                '=
+                                                (mk-exp (:rhs e)
+                                                       (inverse-op (:op (:lhs e)))
+                                                       (:rhs (:lhs e))))
+                                        x)
 
     ;; A * f(X) = B ==> f(x) = B / A
-    (commutative? (:op (:lhs e))) (isolate (mk-exp (:rhs (:lhs e)) '=
-                                                  (mk-exp (:rhs e)
-                                                         (inverse-op (:op (:lhs e)))
-                                                         (:lhs (:lhs e))) x))
+    (commutative? (:op (:lhs e))) (isolate (mk-exp (:rhs (:lhs e)) 
+                                                   '=
+                                                   (mk-exp (:rhs e)
+                                                           (inverse-op (:op (:lhs e)))
+                                                           (:lhs (:lhs e))))
+                                           x)
 
     ;; A / f(X) = B ==> f(x) = A / B
-    :else (isolate (mk-exp (:rhs (:lhs e)) '=
+    :else (isolate (mk-exp (:rhs (:lhs e)) 
+                           '=
                            (mk-exp (:lhs (:lhs e))
-                                 (:op (:lhs e))
-                                 (:rhs e))) x)))
+                                   (:op (:lhs e))
+                                   (:rhs e)))
+                   x)))
                                                   
 
 (defn solve

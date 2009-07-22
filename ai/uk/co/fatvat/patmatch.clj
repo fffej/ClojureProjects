@@ -64,7 +64,7 @@
    starting at position start.  If pat1 is non-constant, then jsut
    return start."
   [pat1 input start]
-  (dbg :patmatch (format "first-match-pos %s %s %s" pat1 input start))
+;  (dbg :patmatch (format "first-match-pos %s %s %s" pat1 input start))
   (cond
     (and (not (sequential? pat1)) (not (variable? pat1)))
       (position (partial = pat1) input start)
@@ -211,6 +211,7 @@
   [input rules :matcher pat-match :rule-if first :rule-then rest :action replace]
   (some 
    (fn [rule]
+     (println rule rule-if (rule-if rule))
      (let [result (matcher (rule-if rule) input)]
        (if (not= result fail)
          (action result (rule-then rule)))))

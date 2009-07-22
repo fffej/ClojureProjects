@@ -138,12 +138,12 @@
   "Translate an English phrase into an equation or expression"
   [words]
   (or
-   (rule-based-translator words *student-rules* 
-                          :rule-if :pattern
-                          :rule-then :response
+   (rule-based-translator words 
+                          *student-rules* 
                           :action (fn [bindings response]
-                                    (replace (into {} (map (fn [x] (translate-pair x) bindings)))
-                                             response)))
+                                    (println bindings response)
+                                    (postwalk-replace bindings response)))
+
    (make-variable words)))
 
 (defn commutative?

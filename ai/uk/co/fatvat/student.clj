@@ -51,13 +51,14 @@
 (pat-match-abbrev '?y* '(?* ?y))
 
 ;; TODO "." isn't a special character, but how should , be handled?
+;; `{ ~(list 'if '?x* (symbol ",") 'then '?y*) 1}
 (defvar *basic-student-rules*
   '{(?x* .)              ?x
     (?x* . ?y*)          (?x ?y)
-    (if ?x* |,| then ?y*)  (?x ?y)
+    (if ?x* then ?y*)  (?x ?y)
     (if ?x* then ?y*)      (?x ?y)
-    (if ?x* |,| ?y*)       (?x ?y)
-    (?x* |,| and ?y*)      (?x ?y)
+    (if ?x* ?y*)       (?x ?y)
+    (?x* and ?y*)      (?x ?y)
     (find ?x* and ?y*)     ((= to-find-1 ?x) (= to-find-2 ?y))
     (find ?x*)             (= to-find ?x)
     (?x* equals ?y*)       (= ?x ?y)

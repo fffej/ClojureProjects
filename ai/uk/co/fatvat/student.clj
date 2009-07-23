@@ -7,13 +7,6 @@
   (:use uk.co.fatvat.debug)
   (:use uk.co.fatvat.patmatch))
 
-(defstruct rule :pattern :response)
-
-(defn mk-rule 
-  "Create a rule with the given pattern and response"
-  [pattern response]
-  (struct rule pattern response))
-
 (defstruct exp :op :lhs :rhs)
 
 (defn exp?
@@ -53,39 +46,40 @@
 ;; TODO "." isn't a special character, but how should , be handled?
 ;; `{ ~(list 'if '?x* (symbol ",") 'then '?y*) 1}
 (defvar *basic-student-rules*
-  '{(?x* .)              ?x
-    (?x* . ?y*)          (?x ?y)
-    (if ?x* then ?y*)  (?x ?y)
-    (if ?x* then ?y*)      (?x ?y)
-    (if ?x* ?y*)       (?x ?y)
-    (?x* and ?y*)      (?x ?y)
-    (find ?x* and ?y*)     ((= to-find-1 ?x) (= to-find-2 ?y))
-    (find ?x*)             (= to-find ?x)
-    (?x* equals ?y*)       (= ?x ?y)
-    (?x* same as ?y*)      (= ?x ?y)
-    (?x* = ?y*)            (= ?x ?y)
-    (?x* is equal to ?y*)  (= ?x ?y)
-    (?x* is ?y*)           (= ?x ?y)
-    (?x* - ?y*)            (- ?x ?y)
-    (?x* minus ?y*)        (- ?x ?y)
-    (difference between ?x* and ?y*)  (- ?y ?x)
-    (difference ?x* and ?y*)          (- ?y ?x)
-    (?x* + ?y*)            (+ ?x ?y)
-    (?x* plus ?y*)         (+ ?x ?y)
-    (sum ?x* and ?y*)      (+ ?x ?y)
-    (product ?x* and ?y*)  (* ?x ?y)
-    (?x* * ?y*)            (* ?x ?y)
-    (?x* times ?y*)        (* ?x ?y)
-    (?x* / ?y*)            (/ ?x ?y)
-    (?x* per ?y*)          (/ ?x ?y)
-    (?x* divided by ?y*)   (/ ?x ?y)
-    (half ?x*)             (/ ?x 2)
-    (one half ?x*)         (/ ?x 2)
-    (twice ?x*)            (* 2 ?x)
-    (square ?x*)           (* ?x ?x)
-    (?x* % less than ?y*)  (* ?y (/ (- 100 ?x) 100))
-    (?x* % more than ?y*)  (* ?y (/ (+ 100 ?x) 100))
-    (?x* % ?y*)            (* (/ ?x 100) ?y)}
+   `[
+     ~['(?x* .) '?x]
+     ~['(?x* . ?y*) '(?x ?y)]
+     ~[(list 'if '?x* (symbol ",") 'then '?y*)  '(?x ?y)]
+     ~['(if ?x* then ?y*)      '(?x ?y)]
+     ~[(list 'if '?x* (symbol ",") '?y*)       '(?x ?y)]
+     ~['(?x* and ?y*)      '(?x ?y)]
+     ~['(find ?x* and ?y*)     '((= to-find-1 ?x) (= to-find-2 ?y))]
+     ~['(find ?x*)             '(= to-find ?x)]
+     ~['(?x* equals ?y*)       '(= ?x ?y)]
+     ~['(?x* same as ?y*)      '(= ?x ?y)]
+     ~['(?x* = ?y*)            '(= ?x ?y)]
+     ~['(?x* is equal to ?y*)  '(= ?x ?y)]
+     ~['(?x* is ?y*)           '(= ?x ?y)]
+     ~['(?x* - ?y*)            '(- ?x ?y)]
+     ~['(?x* minus ?y*)        '(- ?x ?y)]
+     ~['(difference between ?x* and ?y*)  '(- ?y ?x)]
+     ~['(difference ?x* and ?y*)          '(- ?y ?x)]
+     ~['(?x* + ?y*)            '(+ ?x ?y)]
+     ~['(?x* plus ?y*)         '(+ ?x ?y)]
+     ~['(sum ?x* and ?y*)      '(+ ?x ?y)]
+     ~['(product ?x* and ?y*)  '(* ?x ?y)]
+     ~['(?x* * ?y*)            '(* ?x ?y)]
+     ~['(?x* times ?y*)        '(* ?x ?y)]
+     ~['(?x* / ?y*)            '(/ ?x ?y)]
+     ~['(?x* per ?y*)          '(/ ?x ?y)]
+     ~['(?x* divided by ?y*)   '(/ ?x ?y)]
+     ~['(half ?x*)             '(/ ?x 2)]
+     ~['(one half ?x*)         '(/ ?x 2)]
+     ~['(twice ?x*)            '(* 2 ?x)]
+     ~['(square ?x*)           '(* ?x ?x)]
+     ~['(?x* % less than ?y*)  '(* ?y (/ (- 100 ?x) 100))]
+     ~['(?x* % more than ?y*)  '(* ?y (/ (+ 100 ?x) 100))]
+     ~['(?x* % ?y*)            '(* (/ ?x 100) ?y)]]
   "The list of student rules (pre-expansion)")
 
 (defvar operators-and-inverses
@@ -101,9 +95,8 @@
   [f [k v]]
   [(f k) v])
 
-(defvar *student-rules* (into {} (map (partial map-key expand-pat-match-abbrev) *basic-student-rules*))
+(defvar *student-rules* (map (partial map-key expand-pat-match-abbrev) *basic-student-rules*)
   "Student rules (post-expansion)")
-
 
 (defn create-list-of-equations
   "Separate out the equations embedded in nested parens"
@@ -142,9 +135,7 @@
    (rule-based-translator words 
                           *student-rules* 
                           :action (fn [bindings response]
-                                    (println bindings response)
                                     (postwalk-replace bindings response)))
-
    (make-variable words)))
 
 (defn commutative?
@@ -266,8 +257,8 @@
 (defn solve-equations
   "Print the equations and their solution"
   [equations]
-  (print-equations "The equations to be solved are:" equations)
-  (print-equations "The solution is:" (solve (map mk-exp-infix equations) nil)))
+  (print-equations "The equations to be solved are:" equations))
+;  (print-equations "The solution is:" (solve (map mk-exp-infix equations) nil)))
 
 (defn student
   "Solve certain Algebra Word Problems."

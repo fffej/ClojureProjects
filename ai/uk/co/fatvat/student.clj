@@ -135,7 +135,12 @@
    (rule-based-translator words 
                           *student-rules* 
                           :action (fn [bindings response]
-                                    (postwalk-replace bindings response)))
+                                    (postwalk-replace 
+                                     (into {} 
+                                           (map (fn [[var binding]] 
+                                                  [var (translate-to-expression binding)]) 
+                                                bindings))
+                                     response)))
    (make-variable words)))
 
 (defn commutative?

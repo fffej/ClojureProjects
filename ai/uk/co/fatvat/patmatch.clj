@@ -211,9 +211,9 @@
   [input rules :matcher pat-match :rule-if first :rule-then rest :action replace]
   (some 
    (fn [rule]
-     (println "Rule: " rule)
+     (dbg :patmatch (format "Rule: %s" rule))
      (let [result (matcher (rule-if rule) input)]
-       (println "Binding: " result)
+       (dbg :patmmatch (format "Binding: " result))
        (if (not= result fail)
          (action result (rule-then rule)))))
    rules))

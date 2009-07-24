@@ -25,10 +25,11 @@
        (segment-pattern? pattern) (segment-matcher pattern input bindings)
        (single-pattern? pattern) (single-matcher pattern input bindings)
        (and
-	(sequential? pattern)
-	(sequential? input)) (recur (rest pattern) (rest input)
-				    (pat-match (first pattern) (first input)
-					       bindings))
+        (sequential? pattern)
+        (sequential? input)) 
+                    (recur (rest pattern) (rest input)
+                           (pat-match (first pattern) (first input)
+                                      bindings))
        :else fail)))
 
 (defn segment-matcher
@@ -66,9 +67,9 @@
   [pat1 input start]
 ;  (dbg :patmatch (format "first-match-pos %s %s %s" pat1 input start))
   (cond
-    (and (not (sequential? pat1)) (not (variable? pat1)))
+    (and (not (coll? pat1)) (not (variable? pat1)))
       (position (partial = pat1) input start)
-    (< start (count input)) start
+    (<= start (count input)) start
     :else nil))
     
 
@@ -77,19 +78,19 @@
   ([pattern input bindings]
      (segment-match pattern input bindings 0))
   ([pattern input bindings start]
-     (dbg :patmatch (format "Segment Match %s %s %s" pattern input bindings start))
+     (dbg :patmatch (format "Segment Match %s %s %s" pattern (first (list input)) bindings start))
      (let [var (second (first pattern))
-	   pat (rest pattern)]
+           pat (rest pattern)]
        (if (empty? pat)
-	 (match-variable var input bindings)
-	 (let [pos (first-match-pos (first pat) input start)]
-	   (if (nil? pos)
-	     fail
-	     (let [b2 (pat-match pat (map identity (subvec (vec input) pos))
-				 (match-variable var (map identity (subvec (vec input) 0 pos)) bindings))]
-	       (if (= b2 fail)
-		 (segment-match pattern input bindings (inc pos))
-		 b2))))))))
+         (match-variable var input bindings)
+         (let [pos (first-match-pos (first pat) input start)]
+           (if (nil? pos)
+             fail
+             (let [b2 (pat-match pat (subvec (vec input) pos)
+                                  (match-variable var (subvec (vec input) 0 pos) bindings))]
+               (if (= b2 fail)
+                 (segment-match pattern input bindings (inc pos))
+                 b2))))))))
 
 (defn segment-match+ 
   "Match one or more elements of input."
@@ -211,9 +212,7 @@
   [input rules :matcher pat-match :rule-if first :rule-then rest :action replace]
   (some 
    (fn [rule]
-     (dbg :patmatch (format "Rule: %s" rule))
      (let [result (matcher (rule-if rule) input)]
-       (dbg :patmmatch (format "Binding: " result))
        (if (not= result fail)
          (action result (rule-then rule)))))
    rules))

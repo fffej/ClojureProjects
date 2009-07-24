@@ -262,8 +262,13 @@
 (defn solve-equations
   "Print the equations and their solution"
   [equations]
-  (print-equations "The equations to be solved are:" equations))
-;  (print-equations "The solution is:" (solve (map mk-exp-infix equations) nil)))
+  (print-equations "The equations to be solved are:" equations)
+  (solve (map mk-exp-infix equations) nil))
+
+(deftest solve-equations-test
+  (is (= ({:op '=, :lhs 'y, :rhs 2} {:op '=, :lhs 'x, :rhs 2})
+         (solve-equations '((= (+ 3 4) (* (- 5 (+ 2 x)) 7))
+                            (= (+ (* 3 x) y) 12))))))
 
 (defn student
   "Solve certain Algebra Word Problems."

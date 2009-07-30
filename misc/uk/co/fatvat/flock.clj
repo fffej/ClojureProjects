@@ -106,11 +106,8 @@
         [v2x v2y] (alignment boid boids)
         [v3x v3y] (separation boid boids)]
     (update-position 
-     (alter-velocity
-      (alter-velocity 
-       (alter-velocity boid [v1x v1y])
-       [v2x v2y])
-      [v3x v3y]))))
+     (alter-velocity boid [(/ (+ v1x v2x v3x) 3)
+                           (/ (+ v2y v2y v3y) 3)]))))
 
 (defn unitize
   "Unitize the given vector"
@@ -119,7 +116,7 @@
     [(/ x m) (/ y m)]))
 
 (defn perpindicular
-  "Return the vector perpindicular to the supplied"
+  "Return the vector perpendicular to the supplied"
   [[x y]]
   [(* y -1) x])
 

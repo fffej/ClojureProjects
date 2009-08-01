@@ -3,8 +3,7 @@
   (:import [java.awt Color Polygon])
   (:import [java.awt.image BufferedImage])
   (:import [javax.swing.event MouseInputAdapter])
-  (:use clojure.contrib.def)
-  (:use clojure.contrib.except))
+  (:use clojure.contrib.def))
 
 (defvar width 512 "Width of the rendering plane")
 (defvar height 512 "Height of the rendering plane")
@@ -66,11 +65,13 @@
   "Draw the IFS, by kicking off an infinite drawing loop"
   [[x y] transform panel]
   (let [bounds (get-bounds transform)]
-    (doseq [[px py] (iterate (partial calculate-point transform) [0 0])]
+    (doseq [[px py] 
+            (take-while
+             (fn [_] @running)
+             (iterate (partial calculate-point transform) [0 0]))]
       (let [[sx sy] (scale [px py] bounds)]
         (.setRGB source sx sy (rand Integer/MAX_VALUE))
-        (.repaint panel)
-        (throw-if-not @running "interupted")))))
+        (.repaint panel)))))
 
 (defn launch-ui
   "Start up the UI"

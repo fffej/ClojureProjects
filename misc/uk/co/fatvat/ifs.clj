@@ -54,19 +54,23 @@
         maxy (apply max (map second points))]
     [minx maxx miny maxy]))
 
+(defn scale 
+  "Scale x and y to be within the given bounds"
+  [[x y] [minx maxx miny maxy]]
+  (let [xscale (/ width (- maxx minx))
+        yscale (/ height (- maxy miny))]
+    [(Math/abs (dec (Math/floor (* (- x minx) xscale))))
+     (Math/abs (dec (Math/floor (* (- y miny) yscale))))]))
+
 (defn draw-ifs 
   "Draw the IFS, by kicking off an infinite drawing loop"
   [[x y] transform panel]
-  (let [[minx maxx miny maxy] (get-bounds transform)
-        xscale (/ width (- maxx minx))
-        yscale (/ height (- maxy miny))]
+  (let [bounds (get-bounds transform)]
     (doseq [[px py] (iterate (partial calculate-point transform) [0 0])]
-          (.setRGB source 
-                   (Math/abs (dec (Math/floor (* (- px minx) xscale))))
-                   (Math/abs (dec (Math/floor (* (- py miny) yscale))))
-                   (rand Integer/MAX_VALUE))
-          (.repaint panel)
-          (throw-if-not @running "interupted"))))
+      (let [[sx sy] (scale [px py] bounds)]
+        (.setRGB source sx sy (rand Integer/MAX_VALUE))
+        (.repaint panel)
+        (throw-if-not @running "interupted")))))
 
 (defn launch-ui
   "Start up the UI"

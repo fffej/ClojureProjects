@@ -1,5 +1,5 @@
 (ns uk.co.fatvat.ifs
-  (:import [javax.swing JFrame JPanel])
+  (:import [javax.swing JFrame JPanel JSpinner SpinnerNumberModel])
   (:import [java.awt Color Polygon])
   (:import [java.awt.image BufferedImage])
   (:import [javax.swing.event MouseInputAdapter])
@@ -17,11 +17,26 @@
 
 (defstruct transform :function :prob)
 
+(defn magnitude [x y] (Math/sqrt (+ (* x x) (* y y))))
+
+(defn theta [x y] (Math/atan (/ x y)))
+
+(defn phi [x y] (Math/atan (/ y x)))
+
 (defn affine-transform
   "Perform an affine transform"
   [[a b c d e f] [x y]]
   [(+ (* a x) (* b y) e)
    (+ (* c x) (* d y) f)])
+
+(defn sinusoidal
+  [[a b c d e f] [x y]]
+  (affine-transform (Math/sin x) (Math/sin y)))
+
+(defn spherical
+  [[a b c d e f] [x y]]
+  (let [mag (/ 1 (+ (* x x) (* y y)))]
+    (affine-transform (* mag x) (* mag y))))
 
 (defn mk-linear-transform
   [[a b c d e f] prob]
@@ -38,9 +53,15 @@
 (defvar sierpinski-transform
   (list
    (mk-linear-transform [0.5 0.0 0 0.5 0 0] 0.33)
-   (mk-linear-transform [0.5 0.0 0 0.5  0.25 (* 0.5 (/ (Math/sqrt 3) 2))] 0.66)
+   (mk-linear-transform [0.5 0.0 0 0.5 0.25 (* 0.5 (/ (Math/sqrt 3) 2))] 0.66)
    (mk-linear-transform [0.5 0.0 0 0.5 0 0.5 0 ] 1.00))
   "The sierpinski transform")
+
+(defvar random-transform
+  (list
+   (mk-linear-transform [0.5 0.0 0 0.5 0 0] 0.4)
+   (mk-linear-transform [0.5 0.0 0 0.5 0.25 (* 0.5 (/ (Math/sqrt 3) 2))] 0.8)
+   (mk-linear-transform [0.5 0.0 0 0.5 0 0.5 0 ] 1.00)))
    
 (defn calculate-point
   "Calculate the next point to render based on the previous"
@@ -75,7 +96,8 @@
              (fn [_] @running)
              (iterate (partial calculate-point transform) [0 0]))]
       (let [[sx sy] (scale [px py] bounds)]
-        (.setRGB source sx sy (rand Integer/MAX_VALUE))
+        (when (and (>= sx 0) (<= sx width) (>= sy 0) (<= sy height))
+          (.setRGB source sx sy (rand Integer/MAX_VALUE)))
         (.repaint panel)))))
 
 (defn launch-ui

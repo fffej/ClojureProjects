@@ -15,34 +15,39 @@
 (defvar animator (agent [0 0])
   "The agent responsible for animation, value is the point")
 
-(defstruct transform :coefficients :prob)
+(defstruct transform :function :prob)
 
-(defn mk-transform
+(defn affine-transform
+  "Perform an affine transform"
+  [[a b c d e f] [x y]]
+  [(+ (* a x) (* b y) e)
+   (+ (* c x) (* d y) f)])
+
+(defn mk-linear-transform
   [[a b c d e f] prob]
-  (struct transform [a b c d e f] prob))
+  (struct transform (partial affine-transform [a b c d e f]) prob))
 
 (defvar fern-leaf-transform
   (list
-   (mk-transform [0.85 0.04 -0.04 0.85 0.0 1.6] 0.85)
-   (mk-transform [0.2 -0.26 0.23 0.22 0 1.6] 0.92)
-   (mk-transform [-0.15 0.28 0.26 0.24 0 0.04] 0.99)
-   (mk-transform [0 0 0 0.16 0 0] 1.00))
+   (mk-linear-transform [0.85 0.04 -0.04 0.85 0.0 1.6] 0.85)
+   (mk-linear-transform [0.2 -0.26 0.23 0.22 0 1.6] 0.92)
+   (mk-linear-transform [-0.15 0.28 0.26 0.24 0 0.04] 0.99)
+   (mk-linear-transform [0 0 0 0.16 0 0] 1.00))
   "List of attractors for the fern leaf [-2.1818 <= x <= 2.6556 0 <= y <= 9.95851]")
 
 (defvar sierpinski-transform
   (list
-   (mk-transform [0.5 0.0 0 0.5 0 0] 0.33)
-   (mk-transform [0.5 0.0 0 0.5  0.25 (* 0.5 (/ (Math/sqrt 3) 2))] 0.66)
-   (mk-transform [0.5 0.0 0 0.5 0 0.5 0 ] 1.00))
+   (mk-linear-transform [0.5 0.0 0 0.5 0 0] 0.33)
+   (mk-linear-transform [0.5 0.0 0 0.5  0.25 (* 0.5 (/ (Math/sqrt 3) 2))] 0.66)
+   (mk-linear-transform [0.5 0.0 0 0.5 0 0.5 0 ] 1.00))
   "The sierpinski transform")
    
 (defn calculate-point
   "Calculate the next point to render based on the previous"
   [transform [x y]]
   (let [r (rand)
-        t (:coefficients (first (filter (fn [x] (< r (:prob x))) transform)))]
-    [(+ (* (t 0) x) (* (t 1) y) (t 4))
-     (+ (* (t 2) x) (* (t 3) y) (t 5))]))
+        f (:function (first (filter (fn [x] (< r (:prob x))) transform)))]
+    (f [x y])))
 
 (defn get-bounds
   [transform]

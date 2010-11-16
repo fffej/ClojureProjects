@@ -33,13 +33,13 @@
    (= e '*) *
    (= e '+) +
    (= e '-) -
-   (=  e '/) / ))
+   (= e '/) / ))
 
 (defn eval-exp
   "Gargh, why did I choose this representation?"
   [e]
   (if (exp? e)
-    ((:op e) (eval-exp (:lhs e)) (eval-exp (:rhs e)))
+    ((symbol-to-func (:op e)) (eval-exp (:lhs e)) (eval-exp (:rhs e)))
     e))
 
 (defn exp-args

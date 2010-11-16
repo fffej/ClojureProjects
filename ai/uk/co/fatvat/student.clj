@@ -28,6 +28,13 @@
     (struct exp (first e) (mk-exp-infix (nth e 1)) (mk-exp-infix (nth e 2)))
     e))
 
+(defn symbol-to-func [e]
+ (cond
+   (= e '*) *
+   (= e '+) +
+   (= e '-) -
+   (=  e '/) / ))
+
 (defn eval-exp
   "Gargh, why did I choose this representation?"
   [e]

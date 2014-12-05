@@ -6,8 +6,8 @@
 (def activation-function-derivation (fn [y] (- 1.0 (* y y))))
 
 (def num-hidden 50)
-(def learning-rate 0.15)
-(def momentum 0.05)
+(def learning-rate 0.5)
+(def momentum 0.1)
 
 (defstruct bp-nn :weight-input :weight-output :change-input :change-output)
 
